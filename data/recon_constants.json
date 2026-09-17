@@ -1,0 +1,46 @@
+{
+  "version": "1.0.0",
+  "purpose": "DEFENSIVE reconnaissance auto-routes to verify predicted approach corridors and track egress vectors. Not for strike tasking.",
+  "profiles": {
+    "verify_approach": {
+      "label": "Verify predicted approach",
+      "color": "#00e5ff",
+      "dash": "10 6",
+      "default_alt_m": 120,
+      "default_speed_mps": 12,
+      "loiter_s": 45,
+      "waypoint_spacing_m": 400,
+      "note": "Fly corridor centerline toward estimated launch sector; loiter on top contacts"
+    },
+    "track_egress": {
+      "label": "Track egress vector",
+      "color": "#ffcc00",
+      "dash": "6 8",
+      "default_alt_m": 90,
+      "default_speed_mps": 14,
+      "loiter_s": 30,
+      "waypoint_spacing_m": 350,
+      "note": "Follow primary egress fan; sample exit rings"
+    },
+    "orbit_contacts": {
+      "label": "Orbit contact list",
+      "color": "#7cff6b",
+      "dash": "2 6",
+      "default_alt_m": 100,
+      "default_speed_mps": 8,
+      "loiter_s": 60,
+      "orbit_radius_m": 180,
+      "note": "Short orbits around ranked operator candidates"
+    }
+  },
+  "airframe_presets": {
+    "small_quad": { "max_range_km": 8, "cruise_mps": 12, "max_alt_m": 150 },
+    "fixed_wing_isr": { "max_range_km": 40, "cruise_mps": 22, "max_alt_m": 400 },
+    "vtol_recon": { "max_range_km": 25, "cruise_mps": 18, "max_alt_m": 300 }
+  },
+  "ai": {
+    "role": "optional enrichment only",
+    "never_invents_coordinates": true,
+    "outputs": ["mission_notes", "altitude_bias_m", "route_priority", "warnings"]
+  }
+}

@@ -1,53 +1,1422 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Drone Operator Localization</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <title>DOL · C2 Console</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <style>
-    :root { color-scheme: dark; font-family: Segoe UI, sans-serif; }
-    body { margin: 0; background: #0f1216; color: #e8edf2; }
-    header { padding: 12px 16px; border-bottom: 1px solid #2a333d; }
-    h1 { font-size: 18px; margin: 0 0 4px; }
-    .sub { color: #9aa8b5; font-size: 12px; }
-    form { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 16px; align-items: end; }
-    label { font-size: 12px; color: #9aa8b5; display: flex; flex-direction: column; gap: 4px; }
-    input { background: #1a2129; color: #fff; border: 1px solid #33404c; padding: 8px; border-radius: 6px; width: 140px; }
-    button { background: #3d8bfd; color: #fff; border: 0; padding: 10px 16px; border-radius: 6px; cursor: pointer; }
-    button:disabled { opacity: .5; }
-    #map { height: calc(100vh - 170px); }
-    #status { padding: 8px 16px; font-size: 13px; color: #9aa8b5; }
-    .warn { color: #f0c14b; }
+    :root {
+      --bg: #080a08;
+      --panel: #0e110e;
+      --elev: #151a15;
+      --line: #2a3328;
+      --line2: #3d4a38;
+      --text: #d8e0d4;
+      --muted: #7a8a74;
+      --amber: #d4a017;
+      --cyan: #3db8a8;
+      --ok: #6bcf6b;
+      --warn: #d4a017;
+      --danger: #e05a4a;
+      --hi: #c8e06a;
+      font-family: "Barlow Condensed", sans-serif;
+      color-scheme: dark;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); overflow: hidden; }
+    button, input, textarea, select { font: inherit; }
+    button {
+      border: 1px solid var(--line2); background: var(--elev); color: var(--text);
+      padding: 6px 10px; cursor: pointer; letter-spacing: 0.04em; text-transform: uppercase;
+      font-weight: 600; font-size: 0.85rem;
+    }
+    button:hover { border-color: var(--amber); color: #fff; }
+    button.primary { background: var(--amber); color: #111; border-color: var(--amber); }
+    button.primary:hover { filter: brightness(1.08); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    button.on { background: var(--amber); color: #111; border-color: var(--amber); }
+    input, textarea {
+      width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--line);
+      padding: 5px 7px; font-family: "IBM Plex Mono", monospace; font-size: 0.72rem;
+    }
+    input:focus, textarea:focus { outline: 1px solid var(--amber); border-color: var(--amber); }
+    label { display: block; font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+
+    /* layout: topbar + 3-col + bottom HUD */
+    .app {
+      display: grid;
+      grid-template-rows: 40px 1fr 28px;
+      height: 100vh;
+    }
+    .topbar {
+      display: flex; align-items: center; gap: 12px; padding: 0 10px;
+      border-bottom: 1px solid var(--line); background: var(--panel);
+    }
+    .mark {
+      display: flex; align-items: baseline; gap: 8px; white-space: nowrap;
+    }
+    .mark .call { font-size: 1.05rem; font-weight: 700; letter-spacing: 0.12em; color: var(--hi); }
+    .mark .sub { font-size: 0.75rem; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+    .sep { width: 1px; height: 18px; background: var(--line2); }
+    .seg { display: inline-flex; }
+    .seg button { border-radius: 0; margin-left: -1px; padding: 4px 10px; font-size: 0.75rem; }
+    .clock { font-family: "IBM Plex Mono", monospace; font-size: 0.75rem; color: var(--cyan); margin-left: auto; }
+    .place { font-family: "IBM Plex Mono", monospace; font-size: 0.7rem; color: var(--muted); max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .secure { font-size: 0.7rem; letter-spacing: 0.08em; color: var(--ok); }
+    .secure.off { color: var(--warn); }
+
+    .body {
+      display: grid;
+      grid-template-columns: 260px 1fr 280px;
+      min-height: 0;
+    }
+    .rail {
+      background: var(--panel); overflow: auto; min-height: 0;
+      border-right: 1px solid var(--line);
+    }
+    .rail.right { border-right: 0; border-left: 1px solid var(--line); }
+    .map-wrap { position: relative; min-height: 0; background: #000; height: 100%; }
+    #map { height: 100%; width: 100%; min-height: 320px; }
+
+    .blk { padding: 8px 10px; border-bottom: 1px solid var(--line); }
+    .blk h2 {
+      margin: 0 0 6px; font-size: 0.68rem; letter-spacing: 0.14em;
+      text-transform: uppercase; color: var(--amber); font-weight: 600;
+    }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .stack { display: flex; flex-direction: column; gap: 6px; }
+    .row-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+    .row-btns button { width: 100%; }
+    .presets { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+    .presets button {
+      font-size: 0.72rem; padding: 5px 4px; text-align: left;
+      background: var(--bg); color: var(--muted); font-weight: 500; text-transform: none; letter-spacing: 0;
+    }
+    .presets button:hover, .presets button.active { color: var(--text); border-color: var(--cyan); }
+    .hits { list-style: none; margin: 4px 0 0; padding: 0; max-height: 90px; overflow: auto; }
+    .hits li {
+      padding: 4px 5px; cursor: pointer; font-size: 0.72rem;
+      font-family: "IBM Plex Mono", monospace; color: var(--muted);
+      border-bottom: 1px solid var(--line);
+    }
+    .hits li:hover { color: var(--text); background: var(--elev); }
+    .hint { margin: 0; font-size: 0.68rem; color: var(--muted); line-height: 1.3; }
+    details.adv summary {
+      cursor: pointer; font-size: 0.68rem; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--muted); list-style: none;
+    }
+    details.adv summary::-webkit-details-marker { display: none; }
+    details.adv[open] summary { color: var(--amber); margin-bottom: 6px; }
+    textarea#track { min-height: 64px; resize: vertical; }
+    #keyIn { letter-spacing: 0.05em; }
+
+    /* map overlays */
+    .hud-float {
+      position: absolute; z-index: 500; pointer-events: none;
+      font-family: "IBM Plex Mono", monospace; font-size: 0.65rem; color: var(--cyan);
+      text-shadow: 0 0 4px #000;
+    }
+    .hud-float.tl { top: 8px; left: 48px; }
+    .hud-float.tr { top: 8px; right: 10px; text-align: right; }
+    .hud-float.bl {
+      bottom: 12px; left: 10px; top: auto; pointer-events: none;
+      background: rgba(8,10,8,0.75); padding: 4px 8px; border: 1px solid var(--line);
+    }
+    .hud-float.bl .big { color: var(--hi); font-size: 0.78rem; }
+    .pin-legend { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; font-size: 0.68rem; color: var(--muted); }
+    .pin-legend i { display: inline-block; width: 8px; height: 8px; margin-right: 3px; vertical-align: middle; }
+    #map { cursor: crosshair; }
+    #map.aiming-brg { cursor: crosshair; }
+    .aim-head {
+      width: 0; height: 0;
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
+      border-bottom: 18px solid #e05a4a;
+      margin-left: -8px; margin-top: -10px;
+      filter: drop-shadow(0 1px 2px #000);
+      pointer-events: none;
+    }
+    .aim-label {
+      background: rgba(8,10,8,0.9); color: #ffb4a8; border: 1px solid #e05a4a;
+      padding: 3px 8px; font-family: "IBM Plex Mono", monospace; font-size: 11px;
+      white-space: nowrap; border-radius: 2px; pointer-events: none;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.45);
+    }
+    .brg-handle {
+      width: 28px; height: 28px; margin-left: -14px; margin-top: -14px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 40% 35%, #ff8a75 0%, #e05a4a 55%, #9a2f22 100%);
+      border: 2px solid #fff;
+      box-shadow: 0 0 0 2px rgba(224,90,74,0.45), 0 2px 8px rgba(0,0,0,0.55);
+      cursor: grab;
+    }
+    .brg-handle:active, .brg-handle.dragging { cursor: grabbing; transform: scale(1.08); }
+    .brg-handle::after {
+      content: ""; position: absolute; left: 50%; top: 50%;
+      width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: #fff;
+    }
+    .brg-nudge {
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; margin-top: 4px;
+    }
+    .brg-nudge button { padding: 5px 0; font-size: 0.72rem; }
+    .leaflet-container { cursor: crosshair; }
+    .field-flash { animation: flash 0.35s ease; }
+    @keyframes flash { from { border-color: var(--hi); } to { border-color: var(--line); } }
+    .active-field { outline: 1px solid var(--amber); }
+    .crosshair {
+      position: absolute; z-index: 400; left: 50%; top: 50%;
+      width: 18px; height: 18px; margin: -9px 0 0 -9px; pointer-events: none;
+      border: 1px solid rgba(212,160,23,0.55);
+    }
+    .crosshair::before, .crosshair::after {
+      content: ""; position: absolute; background: rgba(212,160,23,0.7);
+    }
+    .crosshair::before { left: 50%; top: 3px; bottom: 3px; width: 1px; margin-left: -0.5px; }
+    .crosshair::after { top: 50%; left: 3px; right: 3px; height: 1px; margin-top: -0.5px; }
+
+    /* right rail intel */
+    .legend-row { display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: 0.72rem; color: var(--muted); }
+    .legend-row span { display: inline-flex; align-items: center; gap: 4px; }
+    .dot { width: 8px; height: 8px; border-radius: 0; display: inline-block; }
+    .intel { font-size: 0.8rem; line-height: 1.35; }
+    .intel .k { color: var(--muted); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; }
+    .intel .v { font-family: "IBM Plex Mono", monospace; font-size: 0.78rem; margin: 2px 0 8px; }
+    .cand-list { display: flex; flex-direction: column; gap: 2px; }
+    .cand {
+      display: grid; grid-template-columns: 28px 52px 1fr; gap: 4px; align-items: start;
+      padding: 5px 4px; border: 1px solid transparent; cursor: pointer;
+      font-family: "IBM Plex Mono", monospace; font-size: 0.7rem;
+    }
+    .cand:hover { border-color: var(--line2); background: var(--elev); }
+    .cand .rk { color: var(--amber); font-weight: 600; }
+    .cand .pct { color: var(--hi); }
+    .cand .why { color: var(--muted); grid-column: 1 / -1; font-size: 0.65rem; padding-left: 28px; }
+
+    .hud {
+      display: flex; align-items: center; gap: 12px; padding: 0 10px;
+      border-top: 1px solid var(--line); background: var(--panel);
+      font-family: "IBM Plex Mono", monospace; font-size: 0.68rem; color: var(--muted);
+    }
+    .hud .msg { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .hud.ok .msg { color: var(--ok); }
+    .hud.warn .msg { color: var(--warn); }
+    .hud.busy .msg { color: var(--cyan); }
+    .hud .tag { color: var(--amber); letter-spacing: 0.1em; }
+    .hud .tag.pulse { animation: pulse-tag 1s ease-in-out infinite; }
+    @keyframes pulse-tag { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+    .job-overlay {
+      position: absolute; z-index: 600; inset: 0; pointer-events: none;
+      display: none; align-items: flex-start; justify-content: center;
+      padding-top: 14px;
+      background: linear-gradient(180deg, rgba(8,10,8,0.55) 0%, rgba(8,10,8,0) 42%);
+    }
+    .job-overlay.on { display: flex; }
+    .job-card {
+      pointer-events: none;
+      min-width: 260px; max-width: 86%;
+      background: rgba(8,10,8,0.92); border: 1px solid var(--amber);
+      padding: 10px 14px; font-family: "IBM Plex Mono", monospace;
+    }
+    .job-card .title { color: var(--amber); font-size: 0.78rem; letter-spacing: 0.12em; }
+    .job-card .stage { color: var(--cyan); font-size: 0.72rem; margin-top: 4px; }
+    .job-card .elapsed { color: var(--muted); font-size: 0.68rem; margin-top: 2px; }
+    .job-bar {
+      margin-top: 8px; height: 3px; background: var(--line); overflow: hidden;
+    }
+    .job-bar > i {
+      display: block; height: 100%; width: 35%; background: var(--amber);
+      animation: job-slide 1.2s ease-in-out infinite;
+    }
+    @keyframes job-slide {
+      0% { transform: translateX(-120%); }
+      100% { transform: translateX(320%); }
+    }
+    button.primary.busy {
+      opacity: 0.85; cursor: wait;
+      background: #3a2e12; border-color: var(--amber); color: var(--amber);
+    }
+    #jobRail {
+      margin-top: 8px; padding: 8px; border: 1px solid var(--line);
+      background: var(--elev); font-family: "IBM Plex Mono", monospace;
+      font-size: 0.7rem; color: var(--muted); display: none;
+    }
+    #jobRail.on { display: block; border-color: var(--amber); color: var(--cyan); }
+    #jobRail .jr-title { color: var(--amber); letter-spacing: 0.08em; font-size: 0.65rem; }
+    #jobRail .jr-stage { margin-top: 3px; }
+    #jobRail .jr-time { margin-top: 2px; color: var(--muted); }
+
+    /* leaflet darken */
+    .leaflet-container { background: #0a0c0a; font: 12px "IBM Plex Mono", monospace; }
+    .leaflet-control-layers, .leaflet-bar a {
+      background: var(--panel) !important; color: var(--text) !important;
+      border-color: var(--line) !important;
+    }
+
+    @media (max-width: 960px) {
+      .body { grid-template-columns: 1fr; grid-template-rows: auto 48vh auto; overflow: auto; }
+      .app { height: auto; min-height: 100vh; overflow: auto; }
+      html, body { overflow: auto; }
+      .rail { border-right: 0; border-bottom: 1px solid var(--line); max-height: none; }
+      .rail.right { border-left: 0; }
+      .crosshair { display: none; }
+    }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Drone Operator Localization</h1>
-    <div class="sub">Live OpenStreetMap buildings · Open-Meteo/SRTM elevation · Esri/NASA satellite · Defensive use only</div>
-  </header>
-  <form id="form">
-    <label>Latitude <input name="lat" value="37.5665" required /></label>
-    <label>Longitude <input name="lng" value="126.9780" required /></label>
-    <label>Bearing ° <input name="bearing" value="90" required /></label>
-    <label>Signal dBm <input name="signal" value="-65" /></label>
-    <button type="submit" id="go">Predict</button>
-  </form>
-  <div id="status">서울 시청 기준으로 OSM 실건물 조회. Predict를 누르세요.</div>
-  <div id="map"></div>
+  <div class="app">
+    <header class="topbar">
+      <div class="mark">
+        <span class="call">DOL</span>
+        <span class="sub" data-i18n="subtitle">Defensive localization console</span>
+      </div>
+      <div class="sep"></div>
+      <div class="seg" id="modeSeg">
+        <button type="button" class="on" data-mode="observe" data-i18n="mode_obs">OBS</button>
+        <button type="button" data-mode="target" data-i18n="mode_tgt">TGT</button>
+        <button type="button" data-mode="predict" data-i18n="mode_fix">FIX</button>
+        <button type="button" data-mode="measure" data-i18n="mode_meas">MEAS</button>
+      </div>
+      <div class="seg" id="langSeg">
+        <button type="button" class="on" data-lang="en">EN</button>
+        <button type="button" data-lang="ru">RU</button>
+        <button type="button" data-lang="uk">UK</button>
+      </div>
+      <span class="secure" id="secBadge">AUTH LOCAL</span>
+      <span class="place" id="placeChip">—</span>
+      <span class="clock" id="clock">--:--:--Z</span>
+    </header>
+
+    <div class="body">
+      <aside class="rail">
+        <div class="blk">
+          <h2 data-i18n="sectors">Sectors</h2>
+          <div class="presets" id="presets"></div>
+        </div>
+
+        <div class="blk">
+          <h2 data-i18n="place_search">Locate</h2>
+          <div style="display:flex;gap:4px">
+            <input id="q" type="search" placeholder="City or place…" data-i18n-ph="search_ph" />
+            <button type="button" id="btnSearch" data-i18n="search">GO</button>
+          </div>
+          <ul class="hits" id="hits"></ul>
+        </div>
+
+        <form id="form" class="blk stack">
+          <h2 data-i18n="observer">Observer</h2>
+          <div class="grid2">
+            <div><label>LAT</label><input name="lat" id="lat" value="52.520000" inputmode="decimal" required /></div>
+            <div><label>LNG</label><input name="lng" id="lng" value="13.405000" inputmode="decimal" required /></div>
+            <div>
+              <label data-i18n="bearing">BRG °</label>
+              <input name="bearing" id="bearing" value="90" inputmode="decimal" required />
+              <div class="brg-nudge">
+                <button type="button" id="brgMinus" title="-15°">−15°</button>
+                <button type="button" id="brgPlus" title="+15°">+15°</button>
+                <button type="button" id="brgReset" title="Redraw arrow">↻</button>
+              </div>
+            </div>
+            <div><label>RSSI</label><input name="signal" value="-65" inputmode="decimal" /></div>
+          </div>
+          <h2 data-i18n="asset">Target / impact</h2>
+          <div class="grid2">
+            <div><label>LAT</label><input name="alat" id="alat" placeholder="—" inputmode="decimal" /></div>
+            <div><label>LNG</label><input name="alng" id="alng" placeholder="—" inputmode="decimal" /></div>
+          </div>
+          <div class="pin-legend">
+            <span><i style="background:#3db8a8"></i><span data-i18n="mode_obs">OBS</span></span>
+            <span><i style="background:#e05a4a"></i><span data-i18n="mode_tgt">TGT</span></span>
+            <span><i style="background:#d4a017"></i><span data-i18n="mode_fix">FIX</span></span>
+          </div>
+          <div class="row-btns">
+            <button type="button" id="gps" data-i18n="gps">GPS OBS</button>
+            <button type="button" id="gpsAsset" data-i18n="gps_asset">GPS TGT</button>
+          </div>
+          <div class="row-btns">
+            <button type="button" id="btnBrg" data-i18n="brg_calc">OBS→TGT BRG</button>
+            <button type="button" id="btnClearTgt" data-i18n="clear_tgt">CLR TGT</button>
+          </div>
+          <button type="submit" class="primary" id="go" data-i18n="analyze" style="width:100%;padding:10px">RUN FIX</button>
+          <div id="jobRail" aria-live="polite">
+            <div class="jr-title">JOB IDLE</div>
+            <div class="jr-stage">—</div>
+            <div class="jr-time">—</div>
+          </div>
+          <p class="hint" data-i18n="map_hint">Tap map: fill LAT/LNG · modes OBS / TGT / FIX / MEAS</p>
+        </form>
+
+        <div class="blk">
+          <h2 data-i18n="recon_title">Recon auto-route</h2>
+          <label data-i18n="recon_profile">Profile</label>
+          <select id="reconProfile" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--line);padding:5px;margin-bottom:6px">
+            <option value="verify_approach">VERIFY APPROACH</option>
+            <option value="track_egress">TRACK EGRESS</option>
+            <option value="orbit_contacts">ORBIT CONTACTS</option>
+          </select>
+          <label data-i18n="recon_air">Airframe</label>
+          <select id="reconAir" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--line);padding:5px;margin-bottom:6px">
+            <option value="small_quad">SMALL QUAD</option>
+            <option value="fixed_wing_isr">FIXED-WING ISR</option>
+            <option value="vtol_recon">VTOL RECON</option>
+          </select>
+          <div class="grid2">
+            <div><label>ALT m</label><input id="reconAlt" type="number" value="120" /></div>
+            <div><label>SPD m/s</label><input id="reconSpd" type="number" value="12" /></div>
+          </div>
+          <label style="margin-top:6px;display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0">
+            <input type="checkbox" id="reconAI" /> <span data-i18n="recon_ai">AI notes (opt)</span>
+          </label>
+          <div class="row-btns" style="margin-top:6px">
+            <button type="button" id="btnRecon" data-i18n="recon_gen">GEN ROUTE</button>
+            <button type="button" id="btnReconExport" data-i18n="recon_export">EXPORT</button>
+          </div>
+          <button type="button" class="primary" id="btnAnalyze" data-i18n="ai_analyze" style="width:100%;margin-top:6px;padding:10px">AI ANALYZE</button>
+          <div class="intel" id="reconOut" style="margin-top:6px"><div class="v">—</div></div>
+        </div>
+
+        <div class="blk">
+          <h2 data-i18n="measure_title">Measure</h2>
+          <div class="intel" id="measureOut"><div class="v">—</div></div>
+        </div>
+
+        <div class="blk">
+          <details class="adv" open>
+            <summary data-i18n="adv">API / AI keys (local)</summary>
+            <label data-i18n="api_key">Server API Key</label>
+            <input id="keyIn" type="password" autocomplete="off" placeholder="X-API-Key" />
+            <label style="margin-top:6px" data-i18n="ai_key">AI API Key</label>
+            <input id="aiKeyIn" type="password" autocomplete="off" placeholder="sk-… / local LLM" />
+            <label style="margin-top:6px" data-i18n="ai_base">AI Base URL</label>
+            <input id="aiBaseIn" type="url" placeholder="https://api.openai.com/v1" />
+            <label style="margin-top:6px" data-i18n="ai_model">AI Model</label>
+            <input id="aiModelIn" type="text" placeholder="gpt-4o-mini" />
+            <label style="margin-top:6px" data-i18n="track_title">Track JSON</label>
+            <textarea id="track" placeholder='[{"t":0,"lat":52.52,"lng":13.40,"alt_m":80,"yaw_deg":90}]'></textarea>
+            <button type="button" id="btnReverse" style="margin-top:6px;width:100%" data-i18n="reverse">REV GEO</button>
+          </details>
+        </div>
+      </aside>
+
+      <main class="map-wrap">
+        <div id="map"></div>
+        <div class="crosshair" aria-hidden="true"></div>
+        <div class="job-overlay" id="jobOverlay" aria-hidden="true">
+          <div class="job-card">
+            <div class="title" id="jobTitle">ANALYZING</div>
+            <div class="stage" id="jobStage">—</div>
+            <div class="elapsed" id="jobElapsed">0s</div>
+            <div class="job-bar"><i></i></div>
+          </div>
+        </div>
+        <div class="hud-float tl" id="hudTL">DEMO —</div>
+        <div class="hud-float tr" id="hudTR">MODE OBS</div>
+        <div class="hud-float bl" id="cursorHud">
+          <div class="big" id="cursorCoord">— · —</div>
+          <div id="cursorHint">MOVE / TAP</div>
+        </div>
+      </main>
+
+      <aside class="rail right">
+        <div class="blk">
+          <h2 data-i18n="legend">Layers</h2>
+          <div class="legend-row" id="layerToggles" style="flex-direction:column;align-items:flex-start;gap:5px">
+            <label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-layer="drone" checked /> <span style="color:#ff2d2d">■</span> DRONE PATH (G1–G3)</label>
+            <label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-layer="egress" checked /> <span style="color:#6bcf6b">■</span> EGRESS (foot/bike/moto/car/mil)</label>
+            <label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-layer="zones" checked /> <span style="color:#a78bfa">■</span> DEP / CCTV</label>
+            <label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-layer="cands" checked /> <span style="color:#f0c14b">■</span> Contacts</label>
+            <label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-layer="recon" /> <span style="color:#00e5ff">■</span> Recon auto</label>
+          </div>
+          <div class="legend-row" style="margin-top:10px;flex-direction:column;align-items:flex-start;gap:3px">
+            <div style="font-size:0.65rem;color:var(--muted);letter-spacing:0.06em">DRONE</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px 10px">
+              <span><i class="dot" style="background:#ff2d2d"></i>G1</span>
+              <span><i class="dot" style="background:#ff8c1a"></i>G2</span>
+              <span><i class="dot" style="background:#f0c14b"></i>G3</span>
+            </div>
+            <div style="font-size:0.65rem;color:var(--muted);letter-spacing:0.06em;margin-top:6px">EGRESS</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px 10px">
+              <span><i class="dot" style="background:#6bcf6b"></i>FOOT</span>
+              <span><i class="dot" style="background:#3d9bfd"></i>BIKE</span>
+              <span><i class="dot" style="background:#2ec4b6"></i>MOTO</span>
+              <span><i class="dot" style="background:#f0c14b"></i>CAR</span>
+              <span><i class="dot" style="background:#c47a2a"></i>MIL</span>
+            </div>
+          </div>
+        </div>
+        <div class="blk intel">
+          <div class="k" data-i18n="metrics">Metrics</div>
+          <div class="v mono" id="metricsBox">—</div>
+          <div class="k" data-i18n="pattern">Pattern</div>
+          <div class="v" id="patternBox">—</div>
+          <div class="k" data-i18n="kinematics">Kinematics</div>
+          <div class="v" id="kinBox">—</div>
+        </div>
+        <div class="blk">
+          <h2 data-i18n="candidates">Contacts</h2>
+          <div class="cand-list" id="candBox"><div class="hint">—</div></div>
+        </div>
+      </aside>
+    </div>
+
+    <footer class="hud" id="status">
+      <span class="tag" id="statusTag">SYS</span>
+      <span class="msg" data-i18n="status_ready">Ready</span>
+    </footer>
+  </div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    const map = L.map("map").setView([37.5665, 126.978], 13);
+    const I18N = {
+      en: {
+        subtitle: "Defensive localization console",
+        sectors: "Presets",
+        place_search: "Locate",
+        search_ph: "City or place…",
+        search: "GO",
+        observer: "Observer",
+        bearing: "BRG °",
+        asset: "Target / impact",
+        gps: "GPS OBS",
+        gps_asset: "GPS TGT",
+        analyze: "RUN FIX",
+        reverse: "REV GEO",
+        measure_title: "Measure",
+        map_hint: "Drag red tip to set inbound BRG · Shift+click to aim",
+        mode_obs: "OBS",
+        mode_tgt: "TGT",
+        mode_fix: "FIX",
+        mode_meas: "MEAS",
+        brg_calc: "OBS→TGT BRG",
+        clear_tgt: "CLR TGT",
+        adv: "Advanced",
+        api_key: "API Key",
+        track_title: "Track JSON",
+        status_ready: "Ready · drag red arrow tip for BRG",
+        legend: "P(contact)",
+        pattern: "Pattern",
+        kinematics: "Kinematics",
+        candidates: "Contacts",
+        hint_obs: "DBL-CLICK OBS · drag red tip = inbound BRG",
+        hint_tgt: "DBL-CLICK / LONG-PRESS → TGT + BRG",
+        hint_fix: "Set OBS · drag red tip · RUN FIX",
+        hint_meas: "DBL-CLICK / LONG-PRESS A then B",
+        hint_aim: "DRAG the red tip · Shift+click map to aim",
+        recon_title: "Recon auto-route",
+        recon_profile: "Profile",
+        recon_air: "Airframe",
+        recon_ai: "AI notes (opt)",
+        recon_gen: "GEN ROUTE",
+        recon_export: "EXPORT",
+        ai_analyze: "AI ANALYZE",
+        adv: "API / AI keys (local)",
+        api_key: "Server API Key",
+        ai_key: "AI API Key",
+        ai_base: "AI Base URL",
+        ai_model: "AI Model",
+        track_title: "Track JSON",
+        status_ready: "Ready · dbl-click / long-press to pin",
+        legend: "P(contact)",
+        pattern: "Pattern",
+        kinematics: "Kinematics",
+        candidates: "Contacts",
+        hint_obs: "DBL-CLICK / LONG-PRESS → OBS",
+        hint_tgt: "DBL-CLICK / LONG-PRESS → TGT + BRG",
+        hint_fix: "DBL-CLICK / LONG-PRESS → OBS + RUN",
+        hint_meas: "DBL-CLICK / LONG-PRESS A then B",
+        recon_title: "Recon auto-route",
+        recon_profile: "Profile",
+        recon_air: "Airframe",
+        recon_ai: "AI notes (opt)",
+        metrics: "Metrics",
+        r_bearing_err: "Δbrg",
+        r_aoa_high: "AoA high",
+        r_aoa_low: "AoA low",
+        r_rssi_match: "RSSI annulus match",
+        r_terrain_los_ok: "Terrain LOS OK",
+        r_terrain_los_poor: "Terrain LOS poor",
+        r_building_los_clear: "Building LOS clear",
+        r_height_m: "Height",
+        r_elev_m: "Elev",
+        r_tower_near: "Tower nearby",
+        r_road_access: "Road access",
+        r_type: "Type",
+        r_military_tag: "Military tag",
+        r_track_prior: "Track prior",
+      },
+      ru: {
+        subtitle: "Консоль защитной локализации",
+        sectors: "Пресеты",
+        place_search: "Поиск",
+        search_ph: "Город или место…",
+        search: "OK",
+        observer: "Наблюдатель",
+        bearing: "Азимут °",
+        asset: "Цель / удар",
+        gps: "GPS НАБЛ",
+        gps_asset: "GPS ЦЕЛЬ",
+        analyze: "РАСЧЁТ",
+        reverse: "ОБР. ГЕО",
+        measure_title: "Измерение",
+        map_hint: "Мышь: двойной клик · Касание: удержать · перетаскивание свободно",
+        mode_obs: "НАБЛ",
+        mode_tgt: "ЦЕЛЬ",
+        mode_fix: "РАСЧ",
+        mode_meas: "ИЗМ",
+        brg_calc: "НАБЛ→ЦЕЛЬ",
+        clear_tgt: "СБР ЦЕЛЬ",
+        adv: "Дополнительно",
+        api_key: "API-ключ",
+        track_title: "Трек JSON",
+        status_ready: "Готово · двойной клик / удержание",
+        legend: "P(контакт)",
+        pattern: "Паттерн",
+        kinematics: "Кинематика",
+        candidates: "Контакты",
+        hint_obs: "ДВОЙНОЙ КЛИК / УДЕРЖАНИЕ → НАБЛ",
+        hint_tgt: "ДВОЙНОЙ КЛИК / УДЕРЖАНИЕ → ЦЕЛЬ",
+        hint_fix: "ДВОЙНОЙ КЛИК / УДЕРЖАНИЕ → РАСЧЁТ",
+        hint_meas: "ДВОЙНОЙ КЛИК / УДЕРЖАНИЕ A затем B",
+        recon_title: "Автомаршрут разведки",
+        recon_profile: "Профиль",
+        recon_air: "Платформа",
+        recon_ai: "AI заметки (опц.)",
+        recon_gen: "МАРШРУТ",
+        recon_export: "ЭКСПОРТ",
+        ai_analyze: "AI АНАЛИЗ",
+        ai_key: "AI ключ",
+        ai_base: "AI Base URL",
+        ai_model: "AI модель",
+        metrics: "Метрики",
+        r_bearing_err: "Δазимут",
+        r_aoa_high: "AoA высокий",
+        r_aoa_low: "AoA низкий",
+        r_rssi_match: "RSSI совпадает",
+        r_terrain_los_ok: "LOS рельефа OK",
+        r_terrain_los_poor: "LOS рельефа плохой",
+        r_building_los_clear: "LOS зданий clear",
+        r_height_m: "Высота",
+        r_elev_m: "Отм.",
+        r_tower_near: "Вышка рядом",
+        r_road_access: "Доступ к дороге",
+        r_type: "Тип",
+        r_military_tag: "military тег",
+        r_track_prior: "Трек prior",
+      },
+      uk: {
+        subtitle: "Консоль захисної локалізації",
+        sectors: "Пресети",
+        place_search: "Пошук",
+        search_ph: "Місто або місце…",
+        search: "OK",
+        observer: "Спостерігач",
+        bearing: "Азимут °",
+        asset: "Ціль / удар",
+        gps: "GPS СПОСТ",
+        gps_asset: "GPS ЦІЛЬ",
+        analyze: "РОЗРАХУНОК",
+        reverse: "ЗВОР. ГЕО",
+        measure_title: "Вимірювання",
+        map_hint: "Миша: подвійний клік · Дотик: утримати · перетягування вільне",
+        mode_obs: "СПОСТ",
+        mode_tgt: "ЦІЛЬ",
+        mode_fix: "РОЗР",
+        mode_meas: "ВИМ",
+        brg_calc: "СПОСТ→ЦІЛЬ",
+        clear_tgt: "ОЧИС ЦІЛЬ",
+        adv: "Додатково",
+        api_key: "API-ключ",
+        track_title: "Трек JSON",
+        status_ready: "Готово · подвійний клік / утримання",
+        legend: "P(контакт)",
+        pattern: "Патерн",
+        kinematics: "Кінематика",
+        candidates: "Контакти",
+        hint_obs: "ПОДВІЙНИЙ КЛІК / УТРИМАННЯ → СПОСТ",
+        hint_tgt: "ПОДВІЙНИЙ КЛІК / УТРИМАННЯ → ЦІЛЬ",
+        hint_fix: "ПОДВІЙНИЙ КЛІК / УТРИМАННЯ → РОЗРАХУНОК",
+        hint_meas: "ПОДВІЙНИЙ КЛІК / УТРИМАННЯ A потім B",
+        recon_title: "Автомаршрут розвідки",
+        recon_profile: "Профіль",
+        recon_air: "Платформа",
+        recon_ai: "AI нотатки (опц.)",
+        recon_gen: "МАРШРУТ",
+        recon_export: "ЕКСПОРТ",
+        ai_analyze: "AI АНАЛІЗ",
+        ai_key: "AI ключ",
+        ai_base: "AI Base URL",
+        ai_model: "AI модель",
+        metrics: "Метрики",
+        r_bearing_err: "Δазимут",
+        r_aoa_high: "AoA високий",
+        r_aoa_low: "AoA низький",
+        r_rssi_match: "RSSI збіг",
+        r_terrain_los_ok: "LOS рельєфу OK",
+        r_terrain_los_poor: "LOS рельєфу поганий",
+        r_building_los_clear: "LOS будівель clear",
+        r_height_m: "Висота",
+        r_elev_m: "Відм.",
+        r_tower_near: "Вишка поруч",
+        r_road_access: "Доступ до дороги",
+        r_type: "Тип",
+        r_military_tag: "military тег",
+        r_track_prior: "Трек prior",
+      }
+    };
+
+    let lang = "en";
+    let mode = "observe";
+    let measureA = null;
+
+    const PRESETS = [
+      { name: "Demo A", lat: 52.5200, lng: 13.4050, bearing: 90 },
+      { name: "Demo B", lat: 48.8566, lng: 2.3522, bearing: 45 },
+      { name: "Demo C", lat: 41.9028, lng: 12.4964, bearing: 180 },
+      { name: "Demo D", lat: 40.4168, lng: -3.7038, bearing: 270 },
+      { name: "Demo E", lat: 35.6762, lng: 139.6503, bearing: 0 },
+      { name: "Demo F", lat: -33.8688, lng: 151.2093, bearing: 120 },
+    ];
+
+    function t(key) { return (I18N[lang] && I18N[lang][key]) || I18N.en[key] || key; }
+
+    function translateReason(code) {
+      if (!code) return "";
+      const s = String(code);
+      if (s.startsWith("bearing_err:")) return `${t("r_bearing_err")} ${s.split(":")[1]}°`;
+      if (s.startsWith("height_m:")) return `${t("r_height_m")} ${s.split(":")[1]}m`;
+      if (s.startsWith("elev_m:")) return `${t("r_elev_m")} ${s.split(":")[1]}m`;
+      if (s.startsWith("type:")) return `${t("r_type")} ${s.split(":")[1]}`;
+      if (s.startsWith("track_prior:")) return `${t("r_track_prior")} ${s.split(":").slice(1).join(":")}`;
+      if (s.startsWith("human:")) return s;
+      if (s.startsWith("osint:")) return s;
+      const map = {
+        aoa_high: "r_aoa_high",
+        aoa_low: "r_aoa_low",
+        rssi_match: "r_rssi_match",
+        terrain_los_ok: "r_terrain_los_ok",
+        terrain_los_poor: "r_terrain_los_poor",
+        building_los_clear: "r_building_los_clear",
+        tower_near: "r_tower_near",
+        road_access: "r_road_access",
+        military_tag: "r_military_tag",
+      };
+      if (map[s]) return t(map[s]);
+      // strip leftover Korean / pass through EN codes
+      return s;
+    }
+
+    function formatReasons(list) {
+      if (!list || !list.length) return "";
+      return list.slice(0, 5).map((r) => {
+        if (r && typeof r === "object") {
+          return r.text || r.code || JSON.stringify(r).slice(0, 80);
+        }
+        return translateReason(r);
+      }).join(" · ");
+    }
+
+    function applyI18n() {
+      document.querySelectorAll("[data-i18n]").forEach((el) => {
+        el.textContent = t(el.getAttribute("data-i18n"));
+      });
+      document.querySelectorAll("[data-i18n-ph]").forEach((el) => {
+        el.placeholder = t(el.getAttribute("data-i18n-ph"));
+      });
+      document.documentElement.lang = lang;
+    }
+
+    function apiHeaders(json) {
+      const h = {};
+      if (json) h["Content-Type"] = "application/json";
+      const key = (document.getElementById("keyIn").value || localStorage.getItem("dol_api_key") || "").trim();
+      if (key) h["X-API-Key"] = key;
+      return h;
+    }
+
+    document.getElementById("keyIn").value = localStorage.getItem("dol_api_key") || "";
+    document.getElementById("aiKeyIn").value = localStorage.getItem("dol_ai_key") || "";
+    document.getElementById("aiBaseIn").value = localStorage.getItem("dol_ai_base") || "https://api.openai.com/v1";
+    document.getElementById("aiModelIn").value = localStorage.getItem("dol_ai_model") || "gpt-4o-mini";
+
+    function persistAi() {
+      localStorage.setItem("dol_ai_key", document.getElementById("aiKeyIn").value.trim());
+      localStorage.setItem("dol_ai_base", document.getElementById("aiBaseIn").value.trim());
+      localStorage.setItem("dol_ai_model", document.getElementById("aiModelIn").value.trim());
+      updateSecBadge();
+    }
+    document.getElementById("keyIn").addEventListener("change", (e) => {
+      localStorage.setItem("dol_api_key", e.target.value.trim());
+      updateSecBadge();
+    });
+    ["aiKeyIn", "aiBaseIn", "aiModelIn"].forEach((id) => {
+      document.getElementById(id).addEventListener("change", persistAi);
+    });
+
+    function updateSecBadge() {
+      const srv = !!(document.getElementById("keyIn").value || "").trim();
+      const ai = !!(document.getElementById("aiKeyIn").value || "").trim();
+      const el = document.getElementById("secBadge");
+      el.textContent = (srv ? "SRV" : "LOCAL") + (ai ? "+AI" : "");
+      el.classList.toggle("off", !ai);
+    }
+
+    function aiPayload() {
+      return {
+        ai_api_key: document.getElementById("aiKeyIn").value.trim() || undefined,
+        ai_base_url: document.getElementById("aiBaseIn").value.trim() || undefined,
+        ai_model: document.getElementById("aiModelIn").value.trim() || undefined,
+      };
+    }
+
+    function tick() {
+      const d = new Date();
+      document.getElementById("clock").textContent =
+        d.toISOString().slice(11, 19) + "Z";
+    }
+    setInterval(tick, 1000); tick();
+
+    const map = L.map("map", {
+      worldCopyJump: false,
+      zoomControl: true,
+      doubleClickZoom: false,
+      dragging: true,
+      tap: true,
+      tapTolerance: 25,
+    }).setView([52.52, 13.405], 11);
     const esri = L.tileLayer(
       "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      { attribution: "Esri World Imagery (Maxar)", maxZoom: 19 }
-    );
-    const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "© OpenStreetMap"
+      { attribution: "Esri", maxZoom: 19 }
+    ).addTo(map);
+    const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "OSM", maxZoom: 19 });
+    L.control.layers({ SAT: esri, MAP: osm }, null, { position: "topright" }).addTo(map);
+
+    const layerObs = L.layerGroup().addTo(map);
+    const layerDrone = L.layerGroup().addTo(map);
+    const layerEgress = L.layerGroup().addTo(map);
+    const layerZones = L.layerGroup().addTo(map);
+    const layerCands = L.layerGroup().addTo(map);
+    const layerMeas = L.layerGroup().addTo(map);
+    const layerPins = L.layerGroup().addTo(map);
+    const layerRecon = L.layerGroup(); // off by default — less clutter
+    const layerAim = L.layerGroup().addTo(map);
+
+    let pinObs = null;
+    let pinTgt = null;
+    let lastContacts = [];
+    let lastReconPlan = null;
+    const LONG_MS = 550;
+    const MOVE_CANCEL_PX = 12;
+    let longTimer = null;
+    let longStart = null;
+    let longMoved = false;
+    let suppressClickUntil = 0;
+
+    // Persistent inbound BRG arrow — drag red tip (no arm/drag dance)
+    let brgHandle = null;
+    let brgShaft = null;
+    let brgHead = null;
+    let brgLabel = null;
+    let brgDragging = false;
+
+    const presetsEl = document.getElementById("presets");
+    PRESETS.forEach((p) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = p.name;
+      b.onclick = () => {
+        presetsEl.querySelectorAll("button").forEach((x) => x.classList.remove("active"));
+        b.classList.add("active");
+        setPair("lat", "lng", p.lat, p.lng);
+        document.getElementById("bearing").value = p.bearing;
+        placeObsPin(p.lat, p.lng);
+        refreshBearingArrow();
+        map.setView([p.lat, p.lng], 12);
+        reversePlace(p.lat, p.lng);
+        document.getElementById("hudTL").textContent = p.name.toUpperCase();
+        setStatus(p.name + " locked", "ok");
+      };
+      presetsEl.appendChild(b);
     });
-    esri.addTo(map);
-    L.control.layers({ "Esri satellite": esri, "OpenStreetMap": osm }).addTo(map);
-    const layer = L.layerGroup().addTo(map);
+
+    function setPair(a, b, lat, lng) {
+      const elA = document.getElementById(a);
+      const elB = document.getElementById(b);
+      elA.value = Number(lat).toFixed(6);
+      elB.value = Number(lng).toFixed(6);
+      elA.classList.remove("field-flash");
+      elB.classList.remove("field-flash");
+      void elA.offsetWidth;
+      elA.classList.add("field-flash");
+      elB.classList.add("field-flash");
+    }
+    function setStatus(msg, kind) {
+      const el = document.getElementById("status");
+      el.className = "hud" + (kind ? " " + kind : "");
+      el.querySelector(".msg").textContent = msg;
+      const tag = document.getElementById("statusTag");
+      if (tag) {
+        tag.textContent = kind === "busy" ? "RUN" : "SYS";
+        tag.classList.toggle("pulse", kind === "busy");
+      }
+    }
+
+    const FIX_STAGES = [
+      "OSM / terrain fetch…",
+      "Localize + human-ops…",
+      "Shortlist + verify…",
+      "Drone path G1–G3…",
+      "Egress FOOT/BIKE/MOTO/CAR/MIL…",
+      "Recon compress…",
+    ];
+    let jobTimer = null;
+    let jobStartedAt = 0;
+    let jobActive = false;
+
+    function startJob(title, stages) {
+      jobActive = true;
+      jobStartedAt = Date.now();
+      const stageList = stages && stages.length ? stages : FIX_STAGES;
+      const overlay = document.getElementById("jobOverlay");
+      const rail = document.getElementById("jobRail");
+      const btn = document.getElementById("go");
+      if (overlay) {
+        overlay.classList.add("on");
+        overlay.setAttribute("aria-hidden", "false");
+      }
+      if (rail) rail.classList.add("on");
+      if (btn) {
+        btn.disabled = true;
+        btn.classList.add("busy");
+        btn.dataset.label = btn.dataset.label || btn.textContent;
+        btn.textContent = "RUNNING…";
+      }
+      document.getElementById("hudTR").textContent = "MODE BUSY";
+      const tick = () => {
+        if (!jobActive) return;
+        const sec = Math.floor((Date.now() - jobStartedAt) / 1000);
+        const stage = stageList[Math.min(stageList.length - 1, Math.floor(sec / 8) % stageList.length)];
+        const titleEl = document.getElementById("jobTitle");
+        const stageEl = document.getElementById("jobStage");
+        const elEl = document.getElementById("jobElapsed");
+        if (titleEl) titleEl.textContent = title;
+        if (stageEl) stageEl.textContent = stage;
+        if (elEl) elEl.textContent = `elapsed ${sec}s · keep this tab open`;
+        if (rail) {
+          rail.querySelector(".jr-title").textContent = title;
+          rail.querySelector(".jr-stage").textContent = stage;
+          rail.querySelector(".jr-time").textContent = `elapsed ${sec}s`;
+        }
+        setStatus(`${title} · ${sec}s · ${stage}`, "busy");
+      };
+      tick();
+      clearInterval(jobTimer);
+      jobTimer = setInterval(tick, 1000);
+    }
+
+    function endJob(okMsg, kind) {
+      jobActive = false;
+      clearInterval(jobTimer);
+      jobTimer = null;
+      const overlay = document.getElementById("jobOverlay");
+      const rail = document.getElementById("jobRail");
+      const btn = document.getElementById("go");
+      if (overlay) {
+        overlay.classList.remove("on");
+        overlay.setAttribute("aria-hidden", "true");
+      }
+      if (rail) rail.classList.remove("on");
+      if (btn) {
+        btn.disabled = false;
+        btn.classList.remove("busy");
+        if (btn.dataset.label) btn.textContent = btn.dataset.label;
+      }
+      document.getElementById("hudTR").textContent = "MODE " + (mode || "OBS").toUpperCase().slice(0, 3);
+      if (okMsg) setStatus(okMsg, kind || "ok");
+    }
+
+    async function fetchJson(url, opts, label) {
+      let res;
+      try {
+        res = await fetch(url, opts);
+      } catch (err) {
+        const hint = window.location.protocol === "file:"
+          ? "Open http://127.0.0.1:8000 (not file://)"
+          : "Server unreachable — is C2 running on :8000?";
+        throw new Error(`FAILED TO FETCH · ${label || url} · ${hint}`);
+      }
+      let data = null;
+      try { data = await res.json(); } catch (_) { data = null; }
+      if (!res.ok) {
+        const detail = data && (typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail || data));
+        throw new Error(detail || `HTTP ${res.status}`);
+      }
+      return data;
+    }
+
+    function fmtCoord(lat, lng) {
+      return Number(lat).toFixed(6) + "  " + Number(lng).toFixed(6);
+    }
+    function bearingBetween(lat1, lng1, lat2, lng2) {
+      const r1 = lat1 * Math.PI / 180, r2 = lat2 * Math.PI / 180;
+      const d = (lng2 - lng1) * Math.PI / 180;
+      const y = Math.sin(d) * Math.cos(r2);
+      const x = Math.cos(r1) * Math.sin(r2) - Math.sin(r1) * Math.cos(r2) * Math.cos(d);
+      return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+    }
+    function flashModeFields() {
+      ["lat", "lng", "alat", "alng", "bearing"].forEach((id) => {
+        document.getElementById(id).classList.remove("active-field");
+      });
+      if (mode === "target") {
+        document.getElementById("alat").classList.add("active-field");
+        document.getElementById("alng").classList.add("active-field");
+      } else if (mode !== "measure") {
+        document.getElementById("lat").classList.add("active-field");
+        document.getElementById("lng").classList.add("active-field");
+      }
+    }
+    function updateCursorHint() {
+      const el = document.getElementById("cursorHint");
+      if (!el) return;
+      el.textContent = t("hint_" + (mode === "observe" ? "obs" : mode === "target" ? "tgt" : mode === "predict" ? "fix" : "meas"));
+      flashModeFields();
+    }
+    function destinationPoint(lat, lng, brgDeg, distKm) {
+      const R = 6371;
+      const δ = distKm / R;
+      const θ = brgDeg * Math.PI / 180;
+      const φ1 = lat * Math.PI / 180;
+      const λ1 = lng * Math.PI / 180;
+      const φ2 = Math.asin(Math.sin(φ1) * Math.cos(δ) + Math.cos(φ1) * Math.sin(δ) * Math.cos(θ));
+      const λ2 = λ1 + Math.atan2(
+        Math.sin(θ) * Math.sin(δ) * Math.cos(φ1),
+        Math.cos(δ) - Math.sin(φ1) * Math.sin(φ2)
+      );
+      return { lat: φ2 * 180 / Math.PI, lng: ((λ2 * 180 / Math.PI + 540) % 360) - 180 };
+    }
+
+    function clearAimGraphics() {
+      layerAim.clearLayers();
+      brgHandle = null;
+      brgShaft = null;
+      brgHead = null;
+      brgLabel = null;
+    }
+
+    function obsPoint() {
+      return {
+        lat: Number(document.getElementById("lat").value),
+        lng: Number(document.getElementById("lng").value),
+      };
+    }
+
+    function readBearing() {
+      const v = Number(document.getElementById("bearing").value);
+      return Number.isFinite(v) ? ((v % 360) + 360) % 360 : 0;
+    }
+
+    function writeBearing(brg, { flash = false, status = false } = {}) {
+      brg = Math.round(((brg % 360) + 360) % 360);
+      const el = document.getElementById("bearing");
+      el.value = brg;
+      if (flash) {
+        el.classList.remove("field-flash");
+        void el.offsetWidth;
+        el.classList.add("field-flash");
+      }
+      if (status) setStatus(`INBOUND BRG ${brg}°`, "ok");
+      return brg;
+    }
+
+    function arrowLengthKm() {
+      const c = map.getCenter();
+      const p0 = map.latLngToContainerPoint(c);
+      const p1 = L.point(p0.x + 120, p0.y);
+      const ll1 = map.containerPointToLatLng(p1);
+      const dLat = (ll1.lat - c.lat) * Math.PI / 180;
+      const dLng = (ll1.lng - c.lng) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2
+        + Math.cos(c.lat * Math.PI / 180) * Math.cos(ll1.lat * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+      const km = 2 * 6371 * Math.asin(Math.min(1, Math.sqrt(a)));
+      return Math.max(0.35, Math.min(3.5, km || 1.2));
+    }
+
+    function tipForBearing(from, brg) {
+      return destinationPoint(from.lat, from.lng, brg, arrowLengthKm());
+    }
+
+    function drawShaftAndDecor(from, to, brg) {
+      if (brgShaft) layerAim.removeLayer(brgShaft);
+      if (brgHead) layerAim.removeLayer(brgHead);
+      if (brgLabel) layerAim.removeLayer(brgLabel);
+      brgShaft = L.polyline(
+        [[from.lat, from.lng], [to.lat, to.lng]],
+        { color: "#e05a4a", weight: brgDragging ? 4 : 5, opacity: 0.95, interactive: false }
+      ).addTo(layerAim);
+      brgHead = L.marker([to.lat, to.lng], {
+        interactive: false,
+        keyboard: false,
+        icon: L.divIcon({
+          className: "",
+          html: `<div class="aim-head" style="transform:rotate(${brg}deg)"></div>`,
+          iconSize: [16, 18],
+          iconAnchor: [8, 10],
+        }),
+      }).addTo(layerAim);
+      brgLabel = L.marker([to.lat, to.lng], {
+        interactive: false,
+        keyboard: false,
+        icon: L.divIcon({
+          className: "",
+          html: `<div class="aim-label">IN ${Math.round(brg)}° · drag tip</div>`,
+          iconSize: [140, 20],
+          iconAnchor: [-10, 22],
+        }),
+      }).addTo(layerAim);
+    }
+
+    function ensureBrgHandle(to) {
+      if (brgHandle) {
+        brgHandle.setLatLng([to.lat, to.lng]);
+        return;
+      }
+      brgHandle = L.marker([to.lat, to.lng], {
+        draggable: true,
+        autoPan: false,
+        zIndexOffset: 1200,
+        icon: L.divIcon({
+          className: "",
+          html: `<div class="brg-handle" title="Drag to set inbound BRG"></div>`,
+          iconSize: [28, 28],
+          iconAnchor: [14, 14],
+        }),
+      }).addTo(layerAim);
+
+      brgHandle.on("dragstart", () => {
+        brgDragging = true;
+        const el = brgHandle.getElement();
+        if (el) el.querySelector(".brg-handle")?.classList.add("dragging");
+        setStatus("DRAG tip → set inbound BRG", "busy");
+      });
+      brgHandle.on("drag", (e) => {
+        const from = obsPoint();
+        if (![from.lat, from.lng].every(Number.isFinite)) return;
+        const ll = e.target.getLatLng();
+        const brg = bearingBetween(from.lat, from.lng, ll.lat, ll.lng);
+        writeBearing(brg);
+        drawShaftAndDecor(from, { lat: ll.lat, lng: ll.lng }, brg);
+      });
+      brgHandle.on("dragend", (e) => {
+        brgDragging = false;
+        const el = brgHandle.getElement();
+        if (el) el.querySelector(".brg-handle")?.classList.remove("dragging");
+        const from = obsPoint();
+        const ll = e.target.getLatLng();
+        const brg = writeBearing(bearingBetween(from.lat, from.lng, ll.lat, ll.lng), {
+          flash: true,
+          status: true,
+        });
+        // Snap tip to fixed visual length so arrow stays readable
+        const tip = tipForBearing(from, brg);
+        brgHandle.setLatLng([tip.lat, tip.lng]);
+        drawShaftAndDecor(from, tip, brg);
+      });
+    }
+
+    function refreshBearingArrow() {
+      if (mode === "measure" || mode === "target") return;
+      const from = obsPoint();
+      if (![from.lat, from.lng].every(Number.isFinite)) return;
+      const brg = readBearing();
+      const tip = tipForBearing(from, brg);
+      drawShaftAndDecor(from, tip, brg);
+      ensureBrgHandle(tip);
+    }
+
+    function nudgeBearing(delta) {
+      writeBearing(readBearing() + delta, { flash: true, status: true });
+      refreshBearingArrow();
+    }
+
+    function aimBearingAt(lat, lng) {
+      const from = obsPoint();
+      if (![from.lat, from.lng].every(Number.isFinite)) return;
+      writeBearing(bearingBetween(from.lat, from.lng, lat, lng), { flash: true, status: true });
+      refreshBearingArrow();
+    }
+
+    function placeObsPin(lat, lng) {
+      if (pinObs) layerPins.removeLayer(pinObs);
+      pinObs = L.circleMarker([lat, lng], {
+        radius: 8, color: "#3db8a8", fillColor: "#3db8a8", fillOpacity: 0.95, weight: 2
+      }).bindTooltip("OBS", { permanent: false }).addTo(layerPins);
+      refreshBearingArrow();
+    }
+    function placeTgtPin(lat, lng) {
+      if (pinTgt) layerPins.removeLayer(pinTgt);
+      pinTgt = L.circleMarker([lat, lng], {
+        radius: 8, color: "#e05a4a", fillColor: "#e05a4a", fillOpacity: 0.95, weight: 2
+      }).bindTooltip("TGT", { permanent: false }).addTo(layerPins);
+    }
+    function syncBrgFromObsTgt() {
+      const oLat = Number(document.getElementById("lat").value);
+      const oLng = Number(document.getElementById("lng").value);
+      const tLat = Number(document.getElementById("alat").value);
+      const tLng = Number(document.getElementById("alng").value);
+      if (![oLat, oLng, tLat, tLng].every(Number.isFinite)) return;
+      writeBearing(bearingBetween(oLat, oLng, tLat, tLng), { flash: true });
+      refreshBearingArrow();
+    }
+
+    async function reversePlace(lat, lng) {
+      try {
+        const r = await fetch(`/api/reverse?lat=${lat}&lng=${lng}`, { headers: apiHeaders() });
+        const d = await r.json();
+        if (d.success || d.display_name) {
+          const label = [d.city, d.country_code || d.country].filter(Boolean).join(" · ") || d.display_name;
+          document.getElementById("placeChip").textContent = (label || "—").toUpperCase();
+        }
+      } catch (_) {}
+    }
+
+    async function applyMapPoint(lat, lng) {
+      document.getElementById("cursorCoord").textContent = fmtCoord(lat, lng);
+      if (mode === "measure") {
+        if (!measureA) {
+          measureA = { lat, lng };
+          layerMeas.clearLayers();
+          L.circleMarker([lat, lng], { radius: 5, color: "#6bcf6b", weight: 2 }).addTo(layerMeas);
+          document.getElementById("measureOut").innerHTML = '<div class="v">A SET · PIN B</div>';
+          setStatus("MEAS A", "ok");
+          return;
+        }
+        const B = { lat, lng };
+        L.circleMarker([lat, lng], { radius: 5, color: "#e05a4a", weight: 2 }).addTo(layerMeas);
+        L.polyline([[measureA.lat, measureA.lng], [B.lat, B.lng]], { color: "#d4a017", weight: 2 }).addTo(layerMeas);
+        const res = await fetch("/api/measure", {
+          method: "POST",
+          headers: apiHeaders(true),
+          body: JSON.stringify({
+            from_point: { latitude: measureA.lat, longitude: measureA.lng },
+            to_point: { latitude: B.lat, longitude: B.lng },
+            include_elevation: true
+          })
+        });
+        const d = await res.json();
+        const elev = d.elevation || {};
+        document.getElementById("measureOut").innerHTML =
+          `<div class="v">${d.distance_m} m · ${d.distance_km} km</div>` +
+          `<div class="v">BRG ${d.bearing_deg}° / BACK ${d.back_bearing_deg}°</div>` +
+          `<div class="v">EL ${elev.from_m ?? "?"}→${elev.to_m ?? "?"} Δ${elev.delta_m ?? "?"}</div>`;
+        document.getElementById("bearing").value = Math.round(d.bearing_deg);
+        measureA = null;
+        setStatus("MEASURE OK", "ok");
+        return;
+      }
+      if (mode === "target") {
+        setPair("alat", "alng", lat, lng);
+        placeTgtPin(lat, lng);
+        syncBrgFromObsTgt();
+        reversePlace(lat, lng);
+        setStatus("TGT " + fmtCoord(lat, lng), "ok");
+        return;
+      }
+      // observe or predict → OBS + refresh draggable BRG arrow
+      setPair("lat", "lng", lat, lng);
+      placeObsPin(lat, lng);
+      if (document.getElementById("alat").value && document.getElementById("alng").value) {
+        syncBrgFromObsTgt();
+      } else {
+        refreshBearingArrow();
+      }
+      reversePlace(lat, lng);
+      setStatus((mode === "predict" ? "FIX " : "OBS ") + fmtCoord(lat, lng) + " · drag red tip for BRG", "ok");
+    }
+
+    document.getElementById("langSeg").onclick = (e) => {
+      const btn = e.target.closest("button[data-lang]");
+      if (!btn) return;
+      lang = btn.dataset.lang;
+      document.querySelectorAll("#langSeg button").forEach((b) => b.classList.toggle("on", b === btn));
+      applyI18n();
+      updateCursorHint();
+    };
+
+    document.getElementById("modeSeg").onclick = (e) => {
+      const btn = e.target.closest("button[data-mode]");
+      if (!btn) return;
+      mode = btn.dataset.mode;
+      measureA = null;
+      layerMeas.clearLayers();
+      document.querySelectorAll("#modeSeg button").forEach((b) => b.classList.toggle("on", b === btn));
+      document.getElementById("hudTR").textContent = "MODE " + mode.toUpperCase();
+      document.getElementById("measureOut").innerHTML = mode === "measure"
+        ? '<div class="v">PIN A THEN B</div>' : '<div class="v">—</div>';
+      updateCursorHint();
+      if (mode !== "measure" && mode !== "target") refreshBearingArrow();
+      else clearAimGraphics();
+    };
+
+    document.getElementById("btnSearch").onclick = async () => {
+      const q = document.getElementById("q").value.trim();
+      if (!q) return;
+      setStatus("GEOCODE…");
+      const r = await fetch(`/api/geocode?q=${encodeURIComponent(q)}&limit=8`, { headers: apiHeaders() });
+      const d = await r.json();
+      const hits = document.getElementById("hits");
+      hits.innerHTML = "";
+      (d.results || []).forEach((item) => {
+        const li = document.createElement("li");
+        li.textContent = `${item.city || item.type || "?"}  ${item.country_code || ""}`.toUpperCase();
+        li.title = item.display_name || "";
+        li.onclick = () => {
+          setPair("lat", "lng", item.latitude, item.longitude);
+          placeObsPin(item.latitude, item.longitude);
+          refreshBearingArrow();
+          map.setView([item.latitude, item.longitude], 12);
+          document.getElementById("placeChip").textContent =
+            ([item.city, item.country_code].filter(Boolean).join(" · ") || "").toUpperCase();
+          document.getElementById("hudTL").textContent = (item.city || "FIX").toUpperCase();
+          setStatus("LOCATED", "ok");
+        };
+        hits.appendChild(li);
+      });
+      setStatus((d.results || []).length ? `${d.results.length} HITS` : "NO HITS", (d.results || []).length ? "ok" : "warn");
+    };
+
+    document.getElementById("q").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); document.getElementById("btnSearch").click(); }
+    });
+
+    document.getElementById("gps").onclick = () => {
+      if (!navigator.geolocation) return setStatus("NO GEOLOCATION", "warn");
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setPair("lat", "lng", pos.coords.latitude, pos.coords.longitude);
+          placeObsPin(pos.coords.latitude, pos.coords.longitude);
+          refreshBearingArrow();
+          map.setView([pos.coords.latitude, pos.coords.longitude], 13);
+          reversePlace(pos.coords.latitude, pos.coords.longitude);
+          setStatus("GPS OBS SET", "ok");
+        },
+        (err) => setStatus(err.message, "warn"),
+        { enableHighAccuracy: true, timeout: 15000 }
+      );
+    };
+
+    document.getElementById("gpsAsset").onclick = () => {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        setPair("alat", "alng", pos.coords.latitude, pos.coords.longitude);
+        placeTgtPin(pos.coords.latitude, pos.coords.longitude);
+        syncBrgFromObsTgt();
+        setStatus("GPS TGT SET", "ok");
+      });
+    };
+
+    document.getElementById("btnReverse").onclick = () => {
+      reversePlace(Number(document.getElementById("lat").value), Number(document.getElementById("lng").value));
+    };
+
+    const btnBrg = document.getElementById("btnBrg");
+    if (btnBrg) btnBrg.onclick = () => { syncBrgFromObsTgt(); setStatus("BRG UPDATED", "ok"); };
+    document.getElementById("brgMinus")?.addEventListener("click", () => nudgeBearing(-15));
+    document.getElementById("brgPlus")?.addEventListener("click", () => nudgeBearing(15));
+    document.getElementById("brgReset")?.addEventListener("click", () => {
+      refreshBearingArrow();
+      setStatus(`BRG ${Math.round(readBearing())}° redrawn`, "ok");
+    });
+    document.getElementById("bearing").addEventListener("change", () => {
+      writeBearing(readBearing(), { flash: true });
+      refreshBearingArrow();
+    });
+    document.getElementById("bearing").addEventListener("input", () => {
+      if (!brgDragging) refreshBearingArrow();
+    });
+    map.on("zoomend", () => { if (!brgDragging) refreshBearingArrow(); });
+
+    const btnClearTgt = document.getElementById("btnClearTgt");
+    if (btnClearTgt) btnClearTgt.onclick = () => {
+      document.getElementById("alat").value = "";
+      document.getElementById("alng").value = "";
+      if (pinTgt) { layerPins.removeLayer(pinTgt); pinTgt = null; }
+      setStatus("TGT CLEARED", "ok");
+    };
+
+    // Cursor readout
+    map.on("mousemove", (e) => {
+      document.getElementById("cursorCoord").textContent = fmtCoord(e.latlng.lat, e.latlng.lng);
+    });
+
+    // Double-click: pin OBS (or Shift+click aim BRG without moving OBS)
+    map.on("dblclick", (e) => {
+      L.DomEvent.stopPropagation(e);
+      if (e.originalEvent && e.originalEvent.shiftKey && mode !== "measure" && mode !== "target") {
+        aimBearingAt(e.latlng.lat, e.latlng.lng);
+        return;
+      }
+      applyMapPoint(e.latlng.lat, e.latlng.lng);
+    });
+
+    // Shift+click: aim BRG at point (keeps OBS)
+    map.on("click", (e) => {
+      if (Date.now() < suppressClickUntil) {
+        L.DomEvent.stop(e);
+        return;
+      }
+      if (e.originalEvent && e.originalEvent.shiftKey && mode !== "measure" && mode !== "target") {
+        L.DomEvent.stop(e);
+        aimBearingAt(e.latlng.lat, e.latlng.lng);
+      }
+    });
+
+    document.addEventListener("keydown", (ev) => {
+      if (ev.key === "ArrowLeft" && ev.altKey) { ev.preventDefault(); nudgeBearing(-5); }
+      if (ev.key === "ArrowRight" && ev.altKey) { ev.preventDefault(); nudgeBearing(5); }
+    });
+
+    function clearLongPress() {
+      if (longTimer) { clearTimeout(longTimer); longTimer = null; }
+      longStart = null;
+      longMoved = false;
+    }
+
+    map.getContainer().addEventListener("touchstart", (ev) => {
+      if (ev.touches.length !== 1) { clearLongPress(); return; }
+      const t = ev.touches[0];
+      longStart = { x: t.clientX, y: t.clientY, t: Date.now() };
+      longMoved = false;
+      longTimer = setTimeout(() => {
+        if (!longStart || longMoved) return;
+        const rect = map.getContainer().getBoundingClientRect();
+        const pt = L.point(longStart.x - rect.left, longStart.y - rect.top);
+        const ll = map.containerPointToLatLng(pt);
+        suppressClickUntil = Date.now() + 400;
+        if (navigator.vibrate) try { navigator.vibrate(30); } catch (_) {}
+        applyMapPoint(ll.lat, ll.lng);
+        clearLongPress();
+      }, LONG_MS);
+    }, { passive: true });
+
+    map.getContainer().addEventListener("touchmove", (ev) => {
+      if (!longStart || !ev.touches[0]) return;
+      const t = ev.touches[0];
+      const dx = t.clientX - longStart.x;
+      const dy = t.clientY - longStart.y;
+      if (dx * dx + dy * dy > MOVE_CANCEL_PX * MOVE_CANCEL_PX) {
+        longMoved = true;
+        clearLongPress();
+      }
+    }, { passive: true });
+
+    map.getContainer().addEventListener("touchend", () => { clearLongPress(); }, { passive: true });
+    map.getContainer().addEventListener("touchcancel", () => { clearLongPress(); }, { passive: true });
+
+    placeObsPin(52.52, 13.405);
+    updateCursorHint();
 
     document.getElementById("form").addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -56,44 +1425,416 @@
         latitude: Number(fd.get("lat")),
         longitude: Number(fd.get("lng")),
         bearing_degrees: Number(fd.get("bearing")),
-        signal_strength_dbm: Number(fd.get("signal") || -65)
+        signal_strength_dbm: Number(fd.get("signal") || -65),
+        lang: lang,
+        ...aiPayload(),
       };
+      if (fd.get("alat") && fd.get("alng")) {
+        body.asset_latitude = Number(fd.get("alat"));
+        body.asset_longitude = Number(fd.get("alng"));
+      }
+      const trackRaw = document.getElementById("track").value.trim();
+      if (trackRaw) {
+        try { body.flight_track = JSON.parse(trackRaw); }
+        catch { return setStatus("BAD TRACK JSON", "warn"); }
+      }
+
       const btn = document.getElementById("go");
-      const status = document.getElementById("status");
-      btn.disabled = true;
-      status.textContent = "Overpass + elevation 조회 중…";
-      layer.clearLayers();
+      startJob("FIX ANALYZING", FIX_STAGES);
+      [layerObs, layerDrone, layerEgress, layerZones, layerCands].forEach((l) => l.clearLayers());
+
       try {
-        const res = await fetch("/api/predict", {
+        const data = await fetchJson("/api/predict", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: apiHeaders(true),
           body: JSON.stringify(body)
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail ? JSON.stringify(data.detail) : res.statusText);
-        L.circleMarker([body.latitude, body.longitude], { radius: 7, color: "#3d8bfd" })
-          .bindPopup("Observer").addTo(layer);
-        if (data.search_sector) {
-          L.geoJSON(data.search_sector, { style: { color: "#f0c14b", weight: 2, fillOpacity: 0.08 } }).addTo(layer);
+        }, "predict");
+
+        if (data.place) {
+          document.getElementById("placeChip").textContent =
+            ([data.place.city, data.place.country_code || data.place.country].filter(Boolean).join(" · ") || "—").toUpperCase();
         }
-        (data.top_10_candidates || []).forEach((c) => {
-          L.circleMarker([c.latitude, c.longitude], { radius: 8, color: "#ff6b6b" })
-            .bindPopup(`#${c.rank} ${(c.probability * 100).toFixed(0)}%<br>${c.building_type}<br>${c.name || c.id}`)
-            .addTo(layer);
+
+        const layers = data.tactical_layers || {};
+        const threat = layers.threat || {};
+        const approach = layers.approach || {};
+        const pattern = layers.attack_pattern || {};
+        const kin = data.kinematics || {};
+
+        L.circleMarker([body.latitude, body.longitude], {
+          radius: 7, color: "#3db8a8", fillColor: "#3db8a8", fillOpacity: 1, weight: 2
+        }).bindPopup("OBS").addTo(layerObs);
+        if (data.asset) {
+          L.circleMarker([data.asset.latitude, data.asset.longitude], {
+            radius: 7, color: "#d4a017", fillColor: "#d4a017", fillOpacity: 1, weight: 2
+          }).bindPopup("ASSET").addTo(layerObs);
+        }
+        if (data.search_sector) {
+          L.geoJSON(data.search_sector, { style: { color: "#d4a017", weight: 2.5, fillOpacity: 0.06, dashArray: "6 4" } }).addTo(layerZones);
+        }
+        if (approach.features && !(data.path_hypotheses && data.path_hypotheses.features)) {
+          L.geoJSON(approach, {
+            style: (f) => f.properties.kind === "centerline"
+              ? { color: "#e05a4a", weight: 5, dashArray: "8 5", opacity: 0.95 }
+              : { color: "#e05a4a", weight: 2, fillOpacity: 0.12, opacity: 0.7 }
+          }).addTo(layerDrone);
+        } else if (approach.features) {
+          L.geoJSON(approach, {
+            filter: (f) => f.properties && f.properties.kind === "corridor",
+            style: { color: "#e05a4a", weight: 2, fillOpacity: 0.08, opacity: 0.55 }
+          }).addTo(layerDrone);
+        }
+        const approachPath = layers.approach_path || {};
+        const egressFc = layers.egress || {};
+        void approachPath;
+        void egressFc;
+
+        // Split path hypotheses: DRONE (warm) vs EGRESS (ground modes)
+        const pathHyp = data.path_hypotheses || layers.path_groups || {};
+        const pathStyle = (f) => {
+          const p = f.properties || {};
+          return {
+            color: p.color || "#ff2d2d",
+            weight: p.stroke_weight || 5,
+            opacity: p.family === "egress" ? 0.9 : 0.95,
+            dashArray: p.dash || null,
+            lineJoin: "round",
+            lineCap: "round",
+          };
+        };
+        const bindPathPopup = (f, lyr) => {
+          const p = f.properties || {};
+          const fam = (p.family || "").toUpperCase();
+          lyr.bindPopup(
+            `<b>${p.label || p.group}</b>` +
+            (fam ? `<br><span style="opacity:.75">${fam}</span>` : "") +
+            `<br>w=${p.weight ?? "?"}<br>${p.note || ""}`
+          );
+        };
+        const droneFc = {
+          type: "FeatureCollection",
+          features: (pathHyp.drone_features || pathHyp.features || []).filter(
+            (f) => (f.properties || {}).family !== "egress" && !String((f.properties || {}).kind || "").startsWith("egress")
+          ),
+        };
+        const egressOnlyFc = {
+          type: "FeatureCollection",
+          features: (pathHyp.egress_features || pathHyp.features || []).filter(
+            (f) => (f.properties || {}).family === "egress" || String((f.properties || {}).kind || "").startsWith("egress")
+          ),
+        };
+        if (droneFc.features.length) {
+          L.geoJSON(droneFc, { style: pathStyle, onEachFeature: bindPathPopup }).addTo(layerDrone);
+          const g1 = (pathHyp.inbound && pathHyp.inbound.g1 && pathHyp.inbound.g1.samples) || [];
+          g1.forEach((s, i) => {
+            if (i % 8 !== 0 || s.agl_m == null) return;
+            L.circleMarker([s.lat, s.lng], {
+              radius: 3.5, color: "#ff2d2d", fillColor: "#ff2d2d", fillOpacity: 0.85, weight: 1
+            }).bindTooltip(`DRONE G1 ${s.agl_m}m`).addTo(layerDrone);
+          });
+        }
+        if (egressOnlyFc.features.length) {
+          L.geoJSON(egressOnlyFc, { style: pathStyle, onEachFeature: bindPathPopup }).addTo(layerEgress);
+        }
+        // Open CCTV tags
+        const cams = ((data.osint || {}).cctv || {}).cameras || [];
+        cams.forEach((cam) => {
+          L.circleMarker([cam.lat, cam.lng], {
+            radius: 5, color: "#a78bfa", fillColor: "#a78bfa", fillOpacity: 0.9, weight: 1
+          }).bindPopup(`CCTV OSM<br>${cam.type || "cam"}`).addTo(layerZones);
         });
+        (threat.observer_zones || []).forEach((z) => {
+          L.circle([z.center.latitude, z.center.longitude], {
+            radius: z.radius_m, color: z.color, fillOpacity: 0.05, weight: 2
+          }).bindPopup(z.label).addTo(layerZones);
+        });
+        (threat.departure_estimates || []).forEach((z) => {
+          L.circle([z.center.latitude, z.center.longitude], {
+            radius: z.radius_m, color: z.color, fillOpacity: 0.14, weight: 2.5
+          }).bindPopup(`${z.label} ${(z.probability * 100).toFixed(0)}%`).addTo(layerZones);
+        });
+        (threat.predicted_impacts || []).forEach((z) => {
+          L.circle([z.center.latitude, z.center.longitude], {
+            radius: z.radius_m, color: z.color, fillOpacity: 0.18, weight: 2
+          }).bindPopup(z.label).addTo(layerZones);
+        });
+
+        const cands = data.top_10_candidates || [];
+        lastContacts = cands;
+        const poolExtra = (data.formula_pool || []).filter((p) => {
+          const id = p.id;
+          return id && !cands.some((c) => c.id === id);
+        }).slice(0, 24);
+        poolExtra.forEach((c) => {
+          L.circleMarker([c.latitude, c.longitude], {
+            radius: 5, color: "#5dade2", fillColor: "#5dade2", fillOpacity: 0.55, weight: 1
+          }).bindPopup(`POOL #${c.rank ?? "?"} ${(c.probability_pct ?? (c.probability || 0) * 100).toFixed(1)}%`).addTo(layerCands);
+        });
+        cands.forEach((c) => {
+          const s = c.map_style || { color: c.color || "#e05a4a", radius: 7, fillOpacity: 0.8 };
+          const m = L.circleMarker([c.latitude, c.longitude], {
+            radius: Math.max(s.radius || 8, 8), color: s.color, fillColor: s.fillColor || s.color, fillOpacity: s.fillOpacity || 0.85, weight: 2
+          }).bindPopup(
+            `#${c.rank} ${(c.probability_pct ?? c.probability * 100).toFixed(1)}%` +
+            (c.human_score != null ? `<br>HUMAN ${Number(c.human_score).toFixed(2)}` : "") +
+            (c.height_m != null ? `<br>H ${c.height_m}m` : "")
+          ).addTo(layerCands);
+          c._marker = m;
+        });
+
+        const pp = pattern.primary_pattern || {};
+        document.getElementById("patternBox").textContent = (pp.name || "—") + (pp.description ? " · " + pp.description : "");
+        document.getElementById("kinBox").textContent = kin && kin.usable
+          ? `${kin.pilot_mode} · n=${kin.sample_count} · conf=${kin.confidence}`
+          : "NO TRACK";
+
+        document.getElementById("candBox").innerHTML = cands.length
+          ? cands.map((c, i) => {
+              const hp = c.human_parts || {};
+              const civ = (c.civilian_risk || {}).band;
+              const cctvN = (c.nearby_cctv || {}).count;
+              const eg = c.egress_modes || {};
+              const terr = (c.terrain_context || {}).terrain_band || "";
+              const vdec = c.verify_decision || "";
+              const humanLine = c.human_score != null
+                ? `human=${Number(c.human_score).toFixed(2)} mid=${hp.mid_elevation ?? "?"} hide=${hp.concealment ?? "?"}`
+                : "";
+              const egLine = `EG F=${Number(eg.egress_foot ?? eg.foot ?? 0).toFixed(2)} B=${Number(eg.egress_bike ?? eg.bike ?? 0).toFixed(2)} M=${Number(eg.egress_motorcycle ?? eg.motorcycle ?? 0).toFixed(2)} C=${Number(eg.egress_car ?? eg.car ?? 0).toFixed(2)} MIL=${Number(eg.egress_armored ?? eg.armored ?? 0).toFixed(2)}`;
+              const why = formatReasons(c.verify_reasons || c.reasons);
+              return `<div class="cand" data-i="${i}">` +
+              `<span class="rk">#${c.rank}</span>` +
+              `<span class="pct">${(c.probability_pct ?? c.probability * 100).toFixed(2)}%</span>` +
+              `<span style="color:${c.color || "#aaa"}">${(c.fix_quality || "fix").toUpperCase()}${vdec ? " · " + String(vdec).toUpperCase() : ""}</span>` +
+              `<span class="why">` +
+              `${Number(c.latitude).toFixed(6)}, ${Number(c.longitude).toFixed(6)} · ` +
+              `r=${(c.confidence_radius_m ?? 0).toFixed(1)}m · Δbrg=${c.bearing_error_deg ?? "?"}° · ` +
+              `d=${c.distance_m != null ? Number(c.distance_m).toFixed(1) + "m" : "?"} · h=${c.height_m ?? "?"}m` +
+              (terr ? ` · TERR ${terr}` : "") +
+              (civ ? ` · CIV ${String(civ).toUpperCase()}` : "") +
+              (cctvN != null ? ` · CCTV ${cctvN}` : "") +
+              (humanLine ? `<br>${humanLine}` : "") +
+              `<br>${egLine}` +
+              `<br>${why}</span></div>`;
+            }).join("")
+          : '<div class="hint">NO CONTACTS</div>';
+
+        const dep = data.departure_tight || (data.tactical_output || {}).departure_zone || {};
+        const ref = data.refine || {};
+        const meta = data.metadata || {};
+        const hops = data.human_ops || {};
+        const env = data.environment || {};
+        const com = data.comms || {};
+        const opt = env.optical || {};
+        const wx = env.weather || {};
+        const ph = data.path_hypotheses || pathHyp || {};
+        const ver = data.verify || {};
+        const terrBand = meta.terrain_band || ((data.terrain || {}).band || {}).band || "";
+        const conf = ((data.engine || {}).conference || {}).consensus || {};
+        document.getElementById("metricsBox").innerHTML =
+          `ENG ${(data.engine || {}).id || "?"} · AI=${((data.engine || {}).ai || {}).applied ? "ON" : "OFF"}` +
+          `<br>DEP r=${dep.radius_m ?? dep.primary_radius_m ?? "?"}m` +
+          (dep.secondary_radius_m ? ` / ${dep.secondary_radius_m}m` : "") +
+          `<br>VIS ${opt.visibility_km ?? "?"}km · WDIR ${wx.wind_direction_deg ?? (env.wind || {}).wind_direction_deg ?? "?"}° · phase ${(env.day_night || {}).phase || "?"}` +
+          `<br>TERR ${terrBand || "?"} · verify keep ${ver.kept ?? "?"} / prune ${ver.pruned ?? "?"}` +
+          `<br>pool ${meta.formula_pool_count ?? "?"} → fix ${cands.length} (+${poolExtra.length} map)` +
+          `<br>paths ${ph.method || "?"} · eg ${ph.egress_method || ph.egress_terrain_class || "?"}` +
+          `<br>recon ${((data.recon_auto || {}).waypoints || []).length || "?"} wp · style ${conf.path_style || "?"}` +
+          `<br>egress-pri ${(conf.egress_mode_priority || []).slice?.(0, 3)?.join?.(">") || conf.egress_mode_priority || "?"}` +
+          `<br>CCTV ${((data.osint || {}).cctv || {}).count ?? "?"} · TRF ${((data.osint || {}).traffic || {}).band ?? "?"}` +
+          (hops.engine ? `<br>HUMAN ${hops.engine}` : "") +
+          (ref.notes ? `<br>${(ref.notes || []).slice(-2).join(" · ")}` : "");
+
+        const deg = meta.osm_degraded ? " · OSM_DEGRADED" : "";
+        endJob(
+          `DONE ${Math.floor((Date.now() - jobStartedAt) / 1000)}s · FIX ${cands.length} · POOL ${meta.formula_pool_count ?? "?"}${deg}`,
+          meta.osm_degraded ? "warn" : "ok"
+        );
+
+        document.querySelectorAll(".cand").forEach((el) => {
+          el.onclick = () => {
+            const c = cands[Number(el.dataset.i)];
+            if (c) map.setView([c.latitude, c.longitude], 15);
+          };
+        });
+
         if (data.bbox) {
           map.fitBounds([[data.bbox.south, data.bbox.west], [data.bbox.north, data.bbox.east]], { padding: [24, 24] });
         }
-        const n = data.metadata && data.metadata.osm_building_count;
-        status.innerHTML = n
-          ? `OSM 건물 ${n}개 · 후보 ${data.top_10_candidates.length}개 · ${data.metadata.processing_time_ms}ms`
-          : `<span class="warn">이 부채꼴에 OSM 건물이 없습니다. 도심 좌표로 다시 시도하세요.</span>`;
       } catch (err) {
-        status.innerHTML = `<span class="warn">${err.message}</span>`;
-      } finally {
-        btn.disabled = false;
+        endJob(String(err.message || err).toUpperCase(), "warn");
       }
     });
+
+    applyI18n();
+    updateSecBadge();
+
+    function drawRecon(plan) {
+      layerRecon.clearLayers();
+      lastReconPlan = plan;
+      const color = plan.color || "#00e5ff";
+      const dash = plan.dash || "10 6";
+      if (plan.geojson) {
+        L.geoJSON(plan.geojson, {
+          style: (f) => ({
+            color: (f.properties && f.properties.color) || color,
+            weight: f.properties && f.properties.kind === "primary_path" ? 6 : 4,
+            dashArray: (f.properties && f.properties.dash) || dash,
+            opacity: 0.95,
+          }),
+        }).addTo(layerRecon);
+      }
+      (plan.waypoints || []).forEach((w, i) => {
+        if (w.kind === "home" || w.kind === "rtb") return;
+        if (i % 3 !== 0 && (w.kind === "corridor" || w.kind === "egress")) return;
+        L.circleMarker([w.lat, w.lng], {
+          radius: 4, color, fillColor: color, fillOpacity: 0.8, weight: 1
+        }).bindTooltip(w.label || w.kind).addTo(layerRecon);
+      });
+    }
+
+    document.getElementById("btnRecon").onclick = async () => {
+      const body = {
+        latitude: Number(document.getElementById("lat").value),
+        longitude: Number(document.getElementById("lng").value),
+        bearing_degrees: Number(document.getElementById("bearing").value),
+        profile: document.getElementById("reconProfile").value,
+        airframe: document.getElementById("reconAir").value,
+        alt_m: Number(document.getElementById("reconAlt").value) || undefined,
+        speed_mps: Number(document.getElementById("reconSpd").value) || undefined,
+        range_km: 3.5,
+        mission_outcome: "unknown",
+        use_ai: !!document.getElementById("reconAI").checked,
+        lang: lang,
+        ...aiPayload(),
+        candidates: lastContacts.slice(0, 5).map((c) => ({
+          latitude: c.latitude,
+          longitude: c.longitude,
+          rank: c.rank,
+          probability: c.probability,
+        })),
+      };
+      const alat = document.getElementById("alat").value;
+      const alng = document.getElementById("alng").value;
+      if (alat && alng) {
+        body.asset_latitude = Number(alat);
+        body.asset_longitude = Number(alng);
+      }
+      startJob("RECON PLAN", ["Build waypoints…", "Compress route…", "Finalize…"]);
+      try {
+        const plan = await fetchJson("/api/recon/plan", {
+          method: "POST",
+          headers: apiHeaders(true),
+          body: JSON.stringify(body),
+        }, "recon");
+        drawRecon(plan);
+        const ai = plan.ai || {};
+        document.getElementById("reconOut").innerHTML =
+          `<div class="v">${plan.profile} · ${plan.waypoints.length} WP</div>` +
+          `<div class="v">${plan.length_m} m · ETA ${plan.eta_min} min</div>` +
+          `<div class="v">ALT ${plan.settings.alt_m} · SPD ${plan.settings.speed_mps}</div>` +
+          (ai.applied ? `<div class="v">AI: ${(ai.mission_notes || "").slice(0, 120)}</div>` : `<div class="v">AI off</div>`);
+        endJob(`RECON ${plan.profile.toUpperCase()} OK`, "ok");
+      } catch (err) {
+        endJob(String(err.message || err).toUpperCase(), "warn");
+      }
+    };
+
+    document.getElementById("btnReconExport").onclick = () => {
+      if (!lastReconPlan) return setStatus("NO RECON PLAN", "warn");
+      const blob = new Blob([JSON.stringify(lastReconPlan.export || lastReconPlan, null, 2)], {
+        type: "application/json",
+      });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `recon_${lastReconPlan.profile || "plan"}.json`;
+      a.click();
+      setStatus("RECON EXPORTED", "ok");
+    };
+
+    document.getElementById("btnAnalyze").onclick = async () => {
+      const body = {
+        latitude: Number(document.getElementById("lat").value),
+        longitude: Number(document.getElementById("lng").value),
+        bearing_degrees: Number(document.getElementById("bearing").value),
+        signal_strength_dbm: Number(document.querySelector("[name=signal]")?.value || -65),
+        mission_outcome: "unknown",
+        use_ai: !!(document.getElementById("aiKeyIn").value || "").trim() || !!document.getElementById("reconAI").checked,
+        lang: lang,
+        ...aiPayload(),
+      };
+      const alat = document.getElementById("alat").value;
+      const alng = document.getElementById("alng").value;
+      if (alat && alng) {
+        body.asset_latitude = Number(alat);
+        body.asset_longitude = Number(alng);
+      }
+      startJob("AI ANALYZE", ["Predict…", "Risk / egress…", "Brief…"]);
+      try {
+        const data = await fetchJson("/api/analyze", {
+          method: "POST",
+          headers: apiHeaders(true),
+          body: JSON.stringify(body),
+        }, "analyze");
+        lastContacts = data.narrowed_candidates || [];
+        if (data.recon_plan) drawRecon(data.recon_plan);
+        const rec = data.recon_recommendation || {};
+        const risk = data.civilian_risk || {};
+        const eg = data.egress || {};
+        const brief = (data.ai_brief && data.ai_brief.brief) || "";
+        document.getElementById("candBox").innerHTML = lastContacts.length
+          ? lastContacts.map((c, i) => {
+              const cr = c.civilian_risk || {};
+              return `<div class="cand" data-i="${i}">` +
+                `<span class="rk">#${c.rank || i + 1}</span>` +
+                `<span class="pct">${((c.probability || 0) * 100).toFixed(1)}%</span>` +
+                `<span style="color:${cr.color || "#aaa"}">${(cr.band || "?").toUpperCase()} CIV</span>` +
+                `<span class="why">${formatReasons(c.reasons) || cr.defensive_action || ""}</span></div>`;
+            }).join("")
+          : '<div class="hint">NO CONTACTS</div>';
+        document.querySelectorAll(".cand").forEach((el) => {
+          el.onclick = () => {
+            const c = lastContacts[Number(el.dataset.i)];
+            if (c) map.setView([c.latitude, c.longitude], 15);
+          };
+        });
+        document.getElementById("reconOut").innerHTML =
+          `<div class="v">MODE ${rec.mode || "?"} · ${rec.profile || ""}</div>` +
+          `<div class="v">${rec.reason || ""}</div>` +
+          `<div class="v">CIV HIGH ${risk.high_risk_count ?? "?"} · EGRESS ${eg.egress_axis_deg ?? "?"}°</div>` +
+          (data.human_nav ? `<div class="v">FOOT LEGS ${data.human_nav.legs.length}</div>` : "") +
+          (brief ? `<div class="v">AI: ${String(brief).slice(0, 140)}</div>` : "");
+        if (data.human_nav && data.human_nav.legs) {
+          data.human_nav.legs.forEach((leg) => {
+            L.polyline(
+              [[leg.from.lat, leg.from.lng], [leg.to.lat, leg.to.lng]],
+              { color: "#7cff6b", weight: 4, dashArray: "6 5" }
+            ).bindTooltip(leg.label).addTo(layerRecon);
+          });
+        }
+        endJob(`ANALYZE OK · ${rec.mode || "recon"} · narrowed ${lastContacts.length}`, "ok");
+      } catch (err) {
+        endJob(String(err.message || err).toUpperCase(), "warn");
+      }
+    };
+
+    document.getElementById("layerToggles")?.addEventListener("change", (e) => {
+      const cb = e.target.closest("input[data-layer]");
+      if (!cb) return;
+      const mapLayers = {
+        drone: layerDrone,
+        egress: layerEgress,
+        zones: layerZones,
+        cands: layerCands,
+        recon: layerRecon,
+      };
+      const Lyr = mapLayers[cb.dataset.layer];
+      if (!Lyr) return;
+      if (cb.checked) map.addLayer(Lyr);
+      else map.removeLayer(Lyr);
+    });
+
+    document.getElementById("hudTL").textContent = "DEMO A";
+    reversePlace(52.52, 13.405);
   </script>
 </body>
 </html>

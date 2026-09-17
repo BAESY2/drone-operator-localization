@@ -1,0 +1,90 @@
+{
+  "engine_id": "defensive_causal_v3",
+  "ai_role": "optional_rerank_only",
+  "security": {
+    "no_strike_planning": true,
+    "no_invented_coords": true,
+    "sanitize_errors": true,
+    "require_api_key_prod": true
+  },
+  "papers_basis": [
+    "dronet2019_aoa",
+    "sensors2023_rssi_ratio",
+    "bgu2020_path_kinematics",
+    "iop2019_tdoa_aoa_nlos",
+    "itu_r_p838_rain",
+    "kruse_visibility_fog",
+    "friis_free_space_plus_urban_n"
+  ],
+  "causal_graph": {
+    "rf_physics": ["aoa", "rssi", "los", "freq_ghz", "tx_dbm", "weather_atten_db"],
+    "human_ops": ["concealment", "mid_elevation", "egress", "standoff", "blend"],
+    "environment": ["visibility_km", "precip_mm", "wind_mps", "cloud_cover"],
+    "comms": ["link_budget_db", "control_range_km", "video_range_km"],
+    "urban": ["civilian_density", "traffic_proxy", "open_cctv"],
+    "paths": ["inbound_g1", "inbound_g2", "inbound_g3", "egress_fan"]
+  },
+  "tight_radius": {
+    "base_m": 55,
+    "aoa_sigma_scale": 4.2,
+    "rssi_scale": 18,
+    "multi_observer_factor": 0.72,
+    "weather_inflate_cap": 1.35,
+    "min_m": 28,
+    "max_m": 140
+  },
+  "weather_rf": {
+    "rain_atten_db_per_km_2g4": 0.05,
+    "rain_atten_db_per_km_5g8": 0.18,
+    "fog_extra_db_vis_lt_1km": 1.5,
+    "wind_gust_link_penalty_db_per_mps": 0.08
+  },
+  "visibility": {
+    "optical_default_km": 12,
+    "fog_kruse_beta": 3.91,
+    "min_ops_vis_km": 0.8
+  },
+  "comms": {
+    "freq_ghz_default": 2.4,
+    "tx_dbm_controller": 20,
+    "rx_sensitivity_dbm": -95,
+    "antenna_gain_db": 2.5,
+    "fade_margin_db": 6,
+    "urban_n": 2.45,
+    "open_n": 2.15,
+    "pl0_db": 40
+  },
+  "path_groups": {
+    "g1": {
+      "label": "PRIMARY",
+      "color": "#ff2d2d",
+      "weight": 0.55,
+      "weave_m": 25,
+      "alt_agl_m": 45,
+      "note": "Most probable inbound — RF bearing centerline + slight weave"
+    },
+    "g2": {
+      "label": "SECONDARY",
+      "color": "#ff8c1a",
+      "weight": 0.28,
+      "bearing_offset_deg": 12,
+      "weave_m": 55,
+      "alt_agl_m": 70,
+      "note": "Terrain / cover alternate corridor"
+    },
+    "g3": {
+      "label": "CONTINGENCY",
+      "color": "#f0c14b",
+      "weight": 0.17,
+      "bearing_offset_deg": -18,
+      "weave_m": 90,
+      "alt_agl_m": 110,
+      "note": "High / flanking contingency path"
+    }
+  },
+  "osint": {
+    "cctv_radius_m": 900,
+    "traffic_radius_m": 700,
+    "cctv_tags": ["surveillance", "camera", "webcam"]
+  }
+}

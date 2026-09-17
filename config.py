@@ -22,8 +22,8 @@ except FileNotFoundError:
     print(f"Warning: drone_specs.json not found at {DATA_DIR}")
     DRONE_SPECS = {}
 
-DEFAULT_BEARING_TOLERANCE = 45
-DEFAULT_RANGE_MIN_KM = 0.3
+DEFAULT_BEARING_TOLERANCE = 18
+DEFAULT_RANGE_MIN_KM = 0.25
 DEFAULT_RANGE_MAX_KM = 50
 
 SCORING_WEIGHTS = {
@@ -39,7 +39,9 @@ SCORING_WEIGHTS = {
 assert abs(sum(SCORING_WEIGHTS.values()) - 1.0) < 0.01, "Weights must sum to 1.0"
 
 API_TIMEOUT = 10
-API_MAX_CANDIDATES = 10
+API_MAX_CANDIDATES = 48
+API_SHORTLIST = 18
+API_FORMULA_POOL = 36
 API_PORT = int(os.getenv("PORT", 3000))
 
 CF_ACCOUNT_ID = os.getenv("CF_ACCOUNT_ID")
@@ -60,10 +62,38 @@ PERFORMANCE_TARGETS = {
     "accuracy_triangulation_meters": 100,
 }
 
-VERSION = "1.0.0"
+VERSION = "2.0.0"
 PROJECT_NAME = "Drone Operator Localization"
 GITHUB_REPO = "https://github.com/baesy/drone-operator-localization"
 LICENSE = "MIT"
+
+# --- Optional geo gate + security ---
+REGION = os.getenv("REGION", "global")
+REGION_BOUNDS = {
+    "lat_min": float(os.getenv("REGION_LAT_MIN", "-90")),
+    "lat_max": float(os.getenv("REGION_LAT_MAX", "90")),
+    "lng_min": float(os.getenv("REGION_LNG_MIN", "-180")),
+    "lng_max": float(os.getenv("REGION_LNG_MAX", "180")),
+}
+REGION_ENFORCE = os.getenv("REGION_ENFORCE", "false").lower() in ("1", "true", "yes")
+# backwards-compatible aliases
+THEATER = REGION
+THEATER_BOUNDS = REGION_BOUNDS
+THEATER_ENFORCE = REGION_ENFORCE
+API_KEY = os.getenv("API_KEY", "").strip()
+ALLOW_INSECURE_DEV = os.getenv("ALLOW_INSECURE_DEV", "true").lower() in ("1", "true", "yes")
+SECURITY_MODE = os.getenv("SECURITY_MODE", "strict")
+RATE_LIMIT_PER_MIN = int(os.getenv("RATE_LIMIT_PER_MIN", "60"))
+ENABLE_OPENAPI = os.getenv("ENABLE_OPENAPI", "false").lower() in ("1", "true", "yes")
+ALLOWED_ORIGINS = [
+    o.strip()
+    for o in os.getenv(
+        "ALLOWED_ORIGINS",
+        "http://127.0.0.1:8000,http://localhost:8000",
+    ).split(",")
+    if o.strip()
+]
+BIND_HOST = os.getenv("BIND_HOST", "127.0.0.1")
 
 LEGAL_NOTICE = """
 LEGAL NOTICE

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Tuple
 from urllib.parse import urlencode
 
-from src.providers.http import get_json
+from src.providers.http import cached_json_stale, get_json
 from src.utils import add_distance_to_coord, nearest_distance_m
 
 OVERPASS_ENDPOINTS = (
@@ -66,30 +66,37 @@ def _center(el: Dict[str, Any]) -> Coord | None:
 
 
 def _sample_points(center: Coord, bearing_deg: float, range_km: float) -> List[Coord]:
-    """방위각을 따라 실제 OSM around 쿼리 지점."""
-    max_d = min(max(range_km, 0.8), 3.0)
-    points: List[Coord] = []
-    dist = 0.45
+    """Denser samples along bearing for more building coverage."""
+    max_d = min(max(range_km, 0.8), 4.0)
+    points: List[Coord] = [center]
+    dist = 0.28
     while dist <= max_d:
         points.append(add_distance_to_coord(center, bearing_deg, dist))
-        dist += 0.7
+        # slight left/right offsets to catch flank buildings
+        points.append(
+            add_distance_to_coord(center, (bearing_deg - 9) % 360, dist * 0.92)
+        )
+        points.append(
+            add_distance_to_coord(center, (bearing_deg + 9) % 360, dist * 0.92)
+        )
+        dist += 0.45
     return points
 
 
 def _query(center: Coord, bearing_deg: float, range_km: float) -> str:
     parts = []
     for lat, lng in _sample_points(center, bearing_deg, range_km):
-        parts.append(f'way["building"](around:480,{lat:.5f},{lng:.5f});')
+        parts.append(f'way["building"](around:420,{lat:.5f},{lng:.5f});')
         parts.append(
             f'way["highway"~"^(motorway|trunk|primary|secondary|tertiary|residential|unclassified)$"]'
-            f"(around:480,{lat:.5f},{lng:.5f});"
+            f"(around:420,{lat:.5f},{lng:.5f});"
         )
         parts.append(
-            f'node["man_made"~"^(mast|tower|communications_tower)$"](around:800,{lat:.5f},{lng:.5f});'
+            f'node["man_made"~"^(mast|tower|communications_tower)$"](around:700,{lat:.5f},{lng:.5f});'
         )
     joined = "\n  ".join(parts)
     return f"""
-[out:json][timeout:25];
+[out:json][timeout:35];
 (
   {joined}
 );
@@ -102,10 +109,17 @@ def fetch_osm_layer(
     bearing_deg: float,
     range_km: float,
 ) -> Dict[str, List]:
+    """
+    Fetch OSM buildings/roads/towers.
+    Fail-open: on Overpass outage return empty lists (+ optional stale cache).
+    Never raise — callers must keep producing a defensive fix.
+    """
     query = _query(center, bearing_deg, range_km)
     body = urlencode({"data": query}).encode("utf-8")
+    cache_key = f"overpass:{query}"
     last_error = None
     payload: Dict[str, Any] = {}
+    degraded = False
 
     for endpoint in OVERPASS_ENDPOINTS:
         try:
@@ -114,9 +128,10 @@ def fetch_osm_layer(
                 method="POST",
                 data=body,
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
-                cache_key=f"overpass:{query}",
+                cache_key=cache_key,
                 ttl_sec=6 * 3600,
-                timeout=28,
+                timeout=10,
+                allow_stale=True,
             )
             if payload.get("elements") is not None:
                 break
@@ -124,8 +139,19 @@ def fetch_osm_layer(
             last_error = exc
             continue
 
-    if not payload:
-        raise RuntimeError(f"Overpass unavailable: {last_error}")
+    if not payload or payload.get("elements") is None:
+        stale = cached_json_stale(cache_key)
+        if stale and stale.get("elements") is not None:
+            payload = stale
+            degraded = True
+        else:
+            return {
+                "buildings": [],
+                "roads": [],
+                "towers": [],
+                "degraded": True,
+                "error": str(last_error or "Overpass unavailable")[:160],
+            }
 
     buildings: List[Dict[str, Any]] = []
     roads: List[Coord] = []
@@ -168,4 +194,9 @@ def fetch_osm_layer(
         building["dist_to_road_m"] = nearest_distance_m(point, roads)
         building["cell_tower_nearby"] = nearest_distance_m(point, towers) < 800
 
-    return {"buildings": buildings, "roads": roads, "towers": towers}
+    out: Dict[str, Any] = {"buildings": buildings, "roads": roads, "towers": towers}
+    if degraded or last_error:
+        out["degraded"] = degraded or False
+        if last_error and not buildings:
+            out["error"] = str(last_error)[:160]
+    return out

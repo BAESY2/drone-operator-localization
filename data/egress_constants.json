@@ -1,0 +1,128 @@
+{
+  "version": "1.0.0",
+  "purpose": "DEFENSIVE post-launch egress prediction for tracking operators after UAV events (success or failure).",
+  "legal": "Not for attacker evasion guidance. Civilian protection / defensive pursuit planning only.",
+  "modes": {
+    "foot": {
+      "label": "도보",
+      "avg_speed_kmh": 4.5,
+      "max_speed_kmh": 6.5,
+      "road_factor": 1.0,
+      "offroad_factor": 0.65,
+      "preferred_ways": ["path", "footway", "residential", "track", "tertiary"],
+      "color": "#6bcf6b",
+      "dash": "4 6"
+    },
+    "bike": {
+      "label": "바이크/자전거",
+      "avg_speed_kmh": 18.0,
+      "max_speed_kmh": 28.0,
+      "road_factor": 1.0,
+      "offroad_factor": 0.45,
+      "preferred_ways": ["cycleway", "residential", "tertiary", "secondary", "track"],
+      "color": "#9bdf4a",
+      "dash": "8 4"
+    },
+    "motorcycle": {
+      "label": "오토바이",
+      "avg_speed_kmh": 45.0,
+      "max_speed_kmh": 80.0,
+      "road_factor": 1.0,
+      "offroad_factor": 0.35,
+      "preferred_ways": ["secondary", "tertiary", "primary", "residential", "trunk"],
+      "color": "#3db8a8",
+      "dash": "10 4"
+    },
+    "car": {
+      "label": "차량",
+      "avg_speed_kmh": 40.0,
+      "max_speed_kmh": 90.0,
+      "road_factor": 1.0,
+      "offroad_factor": 0.15,
+      "preferred_ways": ["primary", "trunk", "secondary", "motorway", "tertiary"],
+      "color": "#d4a017",
+      "dash": "0"
+    },
+    "armored": {
+      "label": "장갑차/중장비",
+      "avg_speed_kmh": 35.0,
+      "max_speed_kmh": 60.0,
+      "road_factor": 0.85,
+      "offroad_factor": 0.7,
+      "preferred_ways": ["track", "unclassified", "tertiary", "secondary", "path"],
+      "color": "#b8860b",
+      "dash": "12 6"
+    },
+    "offroad": {
+      "label": "험지/야지",
+      "avg_speed_kmh": 12.0,
+      "max_speed_kmh": 25.0,
+      "road_factor": 0.5,
+      "offroad_factor": 1.0,
+      "preferred_ways": ["track", "path", "unclassified"],
+      "color": "#8b6914",
+      "dash": "2 4"
+    }
+  },
+  "outcomes": {
+    "success": {
+      "label": "임무 성공 후 도주",
+      "time_budgets_min": [15, 30, 60],
+      "urgency": 0.55,
+      "prefer_highway": true,
+      "note": "더 긴 이탈 · 간선도로/국경 방향 가중"
+    },
+    "failure": {
+      "label": "임무 실패/격추 후 도주",
+      "time_budgets_min": [5, 15, 30],
+      "urgency": 0.9,
+      "prefer_highway": false,
+      "note": "급속 이탈 · 최근접 엄폐→도로"
+    },
+    "unknown": {
+      "label": "결과 미상",
+      "time_budgets_min": [10, 20, 45],
+      "urgency": 0.7,
+      "prefer_highway": true,
+      "note": "중간 가정"
+    }
+  },
+  "road_class_speed_mult": {
+    "motorway": 1.35,
+    "trunk": 1.25,
+    "primary": 1.15,
+    "secondary": 1.0,
+    "tertiary": 0.9,
+    "residential": 0.7,
+    "unclassified": 0.75,
+    "track": 0.45,
+    "path": 0.35,
+    "footway": 0.3,
+    "cycleway": 0.85
+  },
+  "egress_bearings": {
+    "primary_offset_deg": 180,
+    "fan_offsets_deg": [-45, -20, 0, 20, 45, 90, -90],
+    "note": "관측/접근 반대방향 + 측면 부채꼴"
+  },
+  "exit_point_types": [
+    "highway_junction",
+    "rail_station_proxy",
+    "settlement_edge",
+    "forest_cover",
+    "border_vector"
+  ],
+  "layer_colors": {
+    "drone_approach": "#e05a4a",
+    "drone_flight_track": "#ff2d2d",
+    "drone_corridor_fill": "#e05a4a33",
+    "egress_foot": "#6bcf6b",
+    "egress_bike": "#3d9bfd",
+    "egress_motorcycle": "#2ec4b6",
+    "egress_car": "#f0c14b",
+    "egress_armored": "#c47a2a",
+    "egress_offroad": "#8b6914",
+    "exit_point": "#ffffff",
+    "isochrone": "#4a6fa5"
+  }
+}

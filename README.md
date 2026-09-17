@@ -1,57 +1,49 @@
 # Drone Operator Localization
 
-방위각 + GPS로 **실제 OpenStreetMap 건물**을 조회하고, **Open-Meteo/SRTM 고도**와 **Esri/NASA 위성 타일**을 붙여 조종자 후보를 뽑는 오픈소스 도구입니다.
+Worldwide defensive tool: **bearing + GPS** → live **OpenStreetMap buildings** anywhere on Earth, plus elevation, satellite, optional flight-track prior.
 
-목 데이터, 더미 GeoJSON, 합성 후보는 없습니다.
+No mock geospatial dumps. Works in any country (OSM coverage varies by region).
 
 ## Legal notice
 
-**DEFENSIVE USE ONLY.** 자기방어·민간 보호 목적. 사용 책임은 사용자에게 있습니다.
+**DEFENSIVE USE ONLY.** Self-defense / civilian protection. Users assume full liability.
 
-## Live data sources (API keys not required)
+## Live APIs (no keys)
 
-- Buildings / roads / masts: [OpenStreetMap Overpass](https://overpass-api.de/)
-- Elevation: [Open-Meteo](https://open-meteo.com/) → fallback [OpenTopoData SRTM90](https://www.opentopodata.org/)
-- Satellite: Esri World Imagery, [NASA GIBS](https://nasa-gibs.github.io/gibs-api-docs/)
-- Relief tiles: OpenTopoMap
-
-Please respect OSM tile/Overpass usage policies (identifying User-Agent is set).
+| API | Purpose |
+|-----|---------|
+| Overpass (OSM) | Buildings, roads, masts — **global** |
+| Open-Meteo / OpenTopoData | Elevation — **global** |
+| Esri / NASA GIBS / OSM tiles | Imagery — **global** |
+| Nominatim | Place search & reverse geocode — **global** |
+| Local `/api/measure` | Distance, bearing, elev delta |
 
 ## Run
 
 ```bash
-python -m venv venv
-venv\Scripts\activate
 pip install -r requirements.txt
-
-# CLI (Seoul City Hall, bearing east)
-python src/predict_api.py 37.5665 126.9780 90
-
-# Web map + API  http://127.0.0.1:8000
 python -m src
+# → http://127.0.0.1:8000
 ```
 
-`POST /api/predict`
+### Endpoints
 
-```json
-{
-  "latitude": 37.5665,
-  "longitude": 126.9780,
-  "bearing_degrees": 90,
-  "signal_strength_dbm": -65
-}
-```
+- `POST /api/predict` — localize (+ optional `flight_track`, asset)
+- `GET /api/geocode?q=Kyiv` — worldwide place search (`countrycodes` optional filter)
+- `GET /api/reverse?lat=&lng=` — address / country
+- `POST /api/measure` — distance / bearing / elevation between two points
+- `POST /api/measure/path` — multi-point path length
+- `POST /api/elevation` — batch elevations
+- `GET /api/health`
 
-## Tests
+## UI
 
-```bash
-pytest tests/ -v
-```
-
-`test_live.py`는 실제 Overpass/고도 API를 호출합니다.
+- EN / 한국어 toggle
+- Search any city worldwide + regional presets
+- GPS or map click for observer / asset
+- Measure mode (A→B) via live elevation API
+- Probability-colored candidates, corridor, threat rings
 
 ## License
 
-MIT — [LICENSE](LICENSE)
-
-Map data © OpenStreetMap contributors (ODbL). Imagery © Esri/Maxar, NASA EOSDIS GIBS.
+MIT — see [LICENSE](LICENSE)

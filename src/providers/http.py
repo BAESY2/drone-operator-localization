@@ -39,6 +39,20 @@ def cached_json(key: str, ttl_sec: int = 6 * 3600) -> Optional[Any]:
         return None
 
 
+def cached_json_stale(key: str, max_age_sec: int = 7 * 24 * 3600) -> Optional[Any]:
+    """Return cache even past TTL (for upstream outages)."""
+    path = _cache_path(key)
+    if not path.exists():
+        return None
+    age = time.time() - path.stat().st_mtime
+    if age > max_age_sec:
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+
+
 def store_json(key: str, payload: Any) -> None:
     path = _cache_path(key)
     path.write_text(json.dumps(payload), encoding="utf-8")
@@ -53,6 +67,8 @@ def get_json(
     method: str = "GET",
     data: Optional[bytes] = None,
     headers: Optional[Dict[str, str]] = None,
+    *,
+    allow_stale: bool = False,
 ) -> Any:
     if params:
         url = f"{url}?{urlencode(params, doseq=True)}"
@@ -69,6 +85,10 @@ def get_json(
         with urlopen(request, timeout=timeout) as response:
             raw = response.read().decode("utf-8")
     except (HTTPError, URLError, TimeoutError, OSError) as exc:
+        if allow_stale:
+            stale = cached_json_stale(key)
+            if stale is not None:
+                return stale
         raise RuntimeError(f"HTTP failed {url}: {exc}") from exc
 
     payload = json.loads(raw) if raw else {}

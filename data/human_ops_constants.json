@@ -1,0 +1,21 @@
+{
+  "version": "1.0",
+  "principle": "Trained operators optimize concealment+egress+RF, not maximum elevation.",
+  "weights": {
+    "rf_geometry": 0.22,
+    "concealment": 0.18,
+    "egress_access": 0.16,
+    "blend_cover": 0.12,
+    "mid_elevation": 0.10,
+    "standoff": 0.10,
+    "los_usable": 0.08,
+    "cluster_support": 0.04
+  },
+  "notes": [
+    "mid_elevation: inverted-U around ~15m building height; penalize unique skyline ridges",
+    "egress_access: road 40-350m sweet spot; prefer off-axis from inbound bearing",
+    "concealment: industrial/residential blend; bare military tags without corroboration down-weighted",
+    "fusion: P' ∝ P_rf^(1-mix) * H^mix with mix≈0.42",
+    "AI API is optional post-filter only — core ranking never depends on it"
+  ]
+}

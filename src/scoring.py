@@ -118,7 +118,7 @@ def score_all_candidates(
                 "elevation_m": building.get("elevation_m"),
                 "source": building.get("source", "openstreetmap"),
                 "osm_id": building.get("osm_id"),
-                "confidence_radius_m": 450,
+                "confidence_radius_m": 120,
                 "id": building.get("id", f"cand_{idx}"),
             }
         )

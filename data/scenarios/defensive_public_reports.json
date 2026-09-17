@@ -1,0 +1,35 @@
+{
+  "note": "DEFENSIVE localization validation only. Public air-raid / UAV approach reports — NOT strike or bombing aim validation.",
+  "policy": "NO_STRIKE",
+  "scenarios": [
+    {
+      "id": "public_multidir_approach_A",
+      "source_type": "public_news_summary",
+      "description": "Capital area multi-direction UAV approach reported (east / west / river corridor). Observer downtown looking east.",
+      "observer": { "lat": 52.5200, "lng": 13.4050, "bearing_deg": 90 },
+      "expect": {
+        "search_sector_contains_bearing": 90,
+        "recon_profiles_allowed": ["verify_approach", "orbit_contacts"]
+      }
+    },
+    {
+      "id": "public_north_arc_B",
+      "source_type": "public_monitoring_summary",
+      "description": "Northern arc approach pattern reported in open sources. Observer looking north.",
+      "observer": { "lat": 48.8566, "lng": 2.3522, "bearing_deg": 10 },
+      "expect": {
+        "egress_axis_near_deg": 190,
+        "recon_profiles_allowed": ["track_egress", "verify_approach"]
+      }
+    },
+    {
+      "id": "public_coastal_C",
+      "source_type": "public_news_summary",
+      "description": "Coastal city approach from sea sector (south). Defensive verify corridor.",
+      "observer": { "lat": 41.9028, "lng": 12.4964, "bearing_deg": 180 },
+      "expect": {
+        "search_sector_contains_bearing": 180
+      }
+    }
+  ]
+}

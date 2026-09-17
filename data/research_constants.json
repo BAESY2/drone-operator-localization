@@ -1,0 +1,130 @@
+{
+  "papers": [
+    {
+      "id": "bgu2020_mashhadi",
+      "title": "Can the Operator of a Drone Be Located by Following the Drone's Path?",
+      "authors": ["Eliyahu Mashhadi", "Yossi Oren", "Gera Weiss"],
+      "venue": "CSCML 2020, LNCS 12161, pp.85-93",
+      "doi": "10.1007/978-3-030-49785-9_6",
+      "url": "https://hackread.com/wp-content/uploads/2020/07/Locating-Drone-Operators-through-deep-neural-networks.pdf",
+      "press": [
+        "https://www.eurekalert.org/news-releases/653720",
+        "https://in.bgu.ac.il/en/pages/news/drone_pinpoint.aspx"
+      ],
+      "methods": ["flight path DNN", "AirSim POV classification", "position/orientation features"],
+      "metrics": {
+        "accuracy_position_only": 0.73,
+        "accuracy_position_orientation": 0.74,
+        "accuracy_orientation_only": 0.71,
+        "press_accuracy_approx": 0.78,
+        "track_points": 120,
+        "feature_dim_xyz": 360,
+        "note": "RF limited by WiFi/BT/IoT; path-only localization is complementary"
+      }
+    },
+    {
+      "id": "dronet2019",
+      "title": "Towards RF-based Localization of a Drone and Its Controller",
+      "venue": "DroNet / ACM MobiSys Workshop 2019",
+      "doi": "10.1145/3325421.3329766",
+      "url": "https://home.cs.colorado.edu/~rhan/Papers/2019_DRONET_RF-based_Localization.pdf",
+      "methods": ["AoA", "ASA triangulation", "passive SDR"],
+      "metrics": {
+        "controller_bearing_error_deg_mean": 9.9,
+        "controller_location_error_m_mean": 11.36,
+        "drone_bearing_error_deg_mean": 12.2
+      }
+    },
+    {
+      "id": "sensors2023_rssi_ratio",
+      "title": "Drone Controller Localization Based on RSSI Ratio",
+      "venue": "Sensors 2023, 23(11), 5163",
+      "doi": "10.3390/s23115163",
+      "url": "https://www.mdpi.com/1424-8220/23/11/5163",
+      "methods": ["RSSI ratio fingerprint", "model-based RSSI ratio", "TRGR", "WLAN F"],
+      "metrics": {
+        "wlan_f_d0_m": 30,
+        "wlan_f_sigma0_db": 3,
+        "wlan_f_sigma_db": 6,
+        "grid_size_m": [1.0, 2.5],
+        "note": "Tx power unknown → use RSSI ratios; more sensors improve CDF"
+      }
+    },
+    {
+      "id": "sensors2024_music",
+      "title": "Experimental Evaluation of an SDR-Based UAV Localization System",
+      "venue": "Sensors 2024, 24(9), 2789",
+      "doi": "10.3390/s24092789",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11086345/",
+      "methods": ["MUSIC", "UCA antenna array"],
+      "metrics": {
+        "aoa_range_km_demonstrated": 2.5
+      }
+    },
+    {
+      "id": "sensors2025_switched_beam",
+      "title": "Drone’s Angle-of-Arrival Estimation Using a Switched-Beam Antenna and Single-Channel Receiver",
+      "venue": "Sensors 2025, 25(8), 2376",
+      "doi": "10.3390/s25082376",
+      "url": "https://www.mdpi.com/1424-8220/25/8/2376",
+      "methods": ["switched-beam", "single-channel power AoA"],
+      "metrics": {
+        "aoa_error_deg_mean": 5.0
+      }
+    },
+    {
+      "id": "iop2019_tdoa_aoa",
+      "title": "Positioning of radio emission sources with UAVs using TDOA-AOA",
+      "venue": "J. Phys.: Conf. Ser. 1368 (2019) 042040",
+      "doi": "10.1088/1742-6596/1368/4/042040",
+      "methods": ["TDoA+AoA fusion", "NLOS rejection"],
+      "metrics": {
+        "aoa_noise_tolerance_deg": 10
+      }
+    },
+    {
+      "id": "vt2024_rssi_uav",
+      "title": "Differentiation and Localization of Ground RF Transmitters Through RSSI Measures From a UAV",
+      "venue": "IEEE TVT 2024",
+      "doi": "10.1109/tvt.2024.3458416",
+      "methods": ["RSSI ML", "k-means multi-emitter"],
+      "metrics": {"mae_m_rural": 4.0}
+    },
+    {
+      "id": "arxiv_rf_loc_review",
+      "title": "A Review of Radio Frequency Based Localization for Aerial and Ground Robots",
+      "url": "https://arxiv.org/html/2212.05126",
+      "methods": ["RSS log-distance", "AoA", "ToA/TDoA", "hybrid fusion"]
+    },
+    {
+      "id": "itu_r_p838",
+      "title": "ITU-R P.838 — Specific attenuation model for rain",
+      "methods": ["rain_attenuation_db_km"],
+      "note": "Used as proxy coefficients in engine weather_rf"
+    },
+    {
+      "id": "kruse_fog_visibility",
+      "title": "Kruse / Koschmieder visibility–extinction relation (fog/haze)",
+      "methods": ["optical_visibility_km"],
+      "note": "EO feasibility gate for ISR"
+    }
+  ],
+  "engine_constants": {
+    "aoa_sigma_deg_single": 10.0,
+    "aoa_sigma_deg_switched_beam": 5.0,
+    "aoa_sigma_deg_multi": 6.0,
+    "path_loss_exponent_urban": 2.8,
+    "path_loss_exponent_open": 2.2,
+    "shadowing_sigma_db": 6.0,
+    "ref_distance_m": 1.0,
+    "pl0_db_2g4": 40.0,
+    "assumed_controller_tx_dbm": 20.0,
+    "rssi_annulus_sigma_factor": 1.5,
+    "ensemble_temperature": 0.35,
+    "max_candidates_precision": 80,
+    "min_agreement_agents": 2,
+    "kinematics_min_samples": 8,
+    "kinematics_max_samples": 120,
+    "kinematics_bgu_accuracy_ref": 0.73
+  }
+}
