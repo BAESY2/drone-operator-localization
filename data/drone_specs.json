@@ -1,0 +1,152 @@
+{
+  "DJI_Mini_3": {
+    "name": "DJI Mini 3",
+    "range_km": 5,
+    "frequency_ghz": [2.4, 5.8],
+    "sound_db": 75,
+    "signal_pattern": "FHSS",
+    "weight_g": 249,
+    "battery_life_min": 38,
+    "max_altitude_m": 4000
+  },
+  "DJI_Mini_3_Pro": {
+    "name": "DJI Mini 3 Pro",
+    "range_km": 5,
+    "frequency_ghz": [2.4, 5.8],
+    "sound_db": 75,
+    "signal_pattern": "FHSS",
+    "weight_g": 249,
+    "battery_life_min": 34,
+    "max_altitude_m": 4000
+  },
+  "DJI_Mini_4_Pro": {
+    "name": "DJI Mini 4 Pro",
+    "range_km": 6,
+    "frequency_ghz": [2.4, 5.8],
+    "sound_db": 74,
+    "signal_pattern": "FHSS",
+    "weight_g": 249,
+    "battery_life_min": 34,
+    "max_altitude_m": 4000
+  },
+  "DJI_Air_2S": {
+    "name": "DJI Air 2S",
+    "range_km": 8,
+    "frequency_ghz": [2.4, 5.8],
+    "sound_db": 78,
+    "signal_pattern": "FHSS",
+    "weight_g": 595,
+    "battery_life_min": 31,
+    "max_altitude_m": 5000
+  },
+  "DJI_Air_3": {
+    "name": "DJI Air 3",
+    "range_km": 10,
+    "frequency_ghz": [2.4, 5.8],
+    "sound_db": 80,
+    "signal_pattern": "FHSS",
+    "weight_g": 720,
+    "battery_life_min": 46,
+    "max_altitude_m": 6000
+  },
+  "DJI_Air_3S": {
+    "name": "DJI Air 3S",
+    "range_km": 10,
+    "frequency_ghz": [2.4, 5.8],
+    "sound_db": 80,
+    "signal_pattern": "FHSS",
+    "weight_g": 724,
+    "battery_life_min": 45,
+    "max_altitude_m": 6000
+  },
+  "DJI_Mavic_3": {
+    "name": "DJI Mavic 3",
+    "range_km": 15,
+    "frequency_ghz": [2.4, 5.8],
+    "sound_db": 82,
+    "signal_pattern": "FHSS",
+    "weight_g": 895,
+    "battery_life_min": 46,
+    "max_altitude_m": 6000
+  },
+  "DJI_Mavic_3_Pro": {
+    "name": "DJI Mavic 3 Pro",
+    "range_km": 15,
+    "frequency_ghz": [2.4, 5.8],
+    "sound_db": 82,
+    "signal_pattern": "FHSS",
+    "weight_g": 958,
+    "battery_life_min": 43,
+    "max_altitude_m": 6000
+  },
+  "DJI_Matrice_30": {
+    "name": "DJI Matrice 30",
+    "range_km": 15,
+    "frequency_ghz": [2.4, 5.8],
+    "sound_db": 85,
+    "signal_pattern": "FHSS",
+    "weight_g": 3770,
+    "battery_life_min": 41,
+    "max_altitude_m": 7000
+  },
+  "DJI_Matrice_300": {
+    "name": "DJI Matrice 300 RTK",
+    "range_km": 15,
+    "frequency_ghz": [2.4, 5.8],
+    "sound_db": 88,
+    "signal_pattern": "FHSS",
+    "weight_g": 6300,
+    "battery_life_min": 55,
+    "max_altitude_m": 7000
+  },
+  "Auterion_Skynode": {
+    "name": "Auterion Skynode",
+    "range_km": 50,
+    "frequency_ghz": [0.9, 2.4],
+    "sound_db": 70,
+    "signal_pattern": "Encrypted",
+    "weight_g": 450,
+    "battery_life_min": 120,
+    "max_altitude_m": 5000
+  },
+  "Autel_Evo_II": {
+    "name": "Autel EVO II",
+    "range_km": 9,
+    "frequency_ghz": [2.4, 5.8],
+    "sound_db": 79,
+    "signal_pattern": "FHSS",
+    "weight_g": 1127,
+    "battery_life_min": 40,
+    "max_altitude_m": 7000
+  },
+  "FPV_Custom_5inch": {
+    "name": "Custom FPV 5-inch",
+    "range_km": 3,
+    "frequency_ghz": [5.8],
+    "sound_db": 90,
+    "signal_pattern": "Analog/Digital",
+    "weight_g": 650,
+    "battery_life_min": 8,
+    "max_altitude_m": 3000
+  },
+  "Orlan_10": {
+    "name": "Orlan-10 (UAV)",
+    "range_km": 120,
+    "frequency_ghz": [0.9, 1.2],
+    "sound_db": 65,
+    "signal_pattern": "Encrypted",
+    "weight_g": 14000,
+    "battery_life_min": 960,
+    "max_altitude_m": 5000
+  },
+  "Lancet": {
+    "name": "ZALA Lancet",
+    "range_km": 40,
+    "frequency_ghz": [0.9, 2.4],
+    "sound_db": 60,
+    "signal_pattern": "Encrypted",
+    "weight_g": 12000,
+    "battery_life_min": 40,
+    "max_altitude_m": 5000
+  }
+}

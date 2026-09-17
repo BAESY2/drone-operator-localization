@@ -1,0 +1,54 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Env
+.env
+.venv
+venv/
+ENV/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large geospatial data
+*.tif
+*.tiff
+data/ukraine_elevation.tif
+data/ukraine_buildings.geojson
+
+# Local overrides
+config.local.py
+*.log
+
+# Node
+node_modules/
+.vercel/
+
+# Cache
+.cache/
+

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Drone Operator Localization</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    :root { color-scheme: dark; font-family: Segoe UI, sans-serif; }
+    body { margin: 0; background: #0f1216; color: #e8edf2; }
+    header { padding: 12px 16px; border-bottom: 1px solid #2a333d; }
+    h1 { font-size: 18px; margin: 0 0 4px; }
+    .sub { color: #9aa8b5; font-size: 12px; }
+    form { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 16px; align-items: end; }
+    label { font-size: 12px; color: #9aa8b5; display: flex; flex-direction: column; gap: 4px; }
+    input { background: #1a2129; color: #fff; border: 1px solid #33404c; padding: 8px; border-radius: 6px; width: 140px; }
+    button { background: #3d8bfd; color: #fff; border: 0; padding: 10px 16px; border-radius: 6px; cursor: pointer; }
+    button:disabled { opacity: .5; }
+    #map { height: calc(100vh - 170px); }
+    #status { padding: 8px 16px; font-size: 13px; color: #9aa8b5; }
+    .warn { color: #f0c14b; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Drone Operator Localization</h1>
+    <div class="sub">Live OpenStreetMap buildings · Open-Meteo/SRTM elevation · Esri/NASA satellite · Defensive use only</div>
+  </header>
+  <form id="form">
+    <label>Latitude <input name="lat" value="37.5665" required /></label>
+    <label>Longitude <input name="lng" value="126.9780" required /></label>
+    <label>Bearing ° <input name="bearing" value="90" required /></label>
+    <label>Signal dBm <input name="signal" value="-65" /></label>
+    <button type="submit" id="go">Predict</button>
+  </form>
+  <div id="status">서울 시청 기준으로 OSM 실건물 조회. Predict를 누르세요.</div>
+  <div id="map"></div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const map = L.map("map").setView([37.5665, 126.978], 13);
+    const esri = L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      { attribution: "Esri World Imagery (Maxar)", maxZoom: 19 }
+    );
+    const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "© OpenStreetMap"
+    });
+    esri.addTo(map);
+    L.control.layers({ "Esri satellite": esri, "OpenStreetMap": osm }).addTo(map);
+    const layer = L.layerGroup().addTo(map);
+
+    document.getElementById("form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const body = {
+        latitude: Number(fd.get("lat")),
+        longitude: Number(fd.get("lng")),
+        bearing_degrees: Number(fd.get("bearing")),
+        signal_strength_dbm: Number(fd.get("signal") || -65)
+      };
+      const btn = document.getElementById("go");
+      const status = document.getElementById("status");
+      btn.disabled = true;
+      status.textContent = "Overpass + elevation 조회 중…";
+      layer.clearLayers();
+      try {
+        const res = await fetch("/api/predict", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail ? JSON.stringify(data.detail) : res.statusText);
+        L.circleMarker([body.latitude, body.longitude], { radius: 7, color: "#3d8bfd" })
+          .bindPopup("Observer").addTo(layer);
+        if (data.search_sector) {
+          L.geoJSON(data.search_sector, { style: { color: "#f0c14b", weight: 2, fillOpacity: 0.08 } }).addTo(layer);
+        }
+        (data.top_10_candidates || []).forEach((c) => {
+          L.circleMarker([c.latitude, c.longitude], { radius: 8, color: "#ff6b6b" })
+            .bindPopup(`#${c.rank} ${(c.probability * 100).toFixed(0)}%<br>${c.building_type}<br>${c.name || c.id}`)
+            .addTo(layer);
+        });
+        if (data.bbox) {
+          map.fitBounds([[data.bbox.south, data.bbox.west], [data.bbox.north, data.bbox.east]], { padding: [24, 24] });
+        }
+        const n = data.metadata && data.metadata.osm_building_count;
+        status.innerHTML = n
+          ? `OSM 건물 ${n}개 · 후보 ${data.top_10_candidates.length}개 · ${data.metadata.processing_time_ms}ms`
+          : `<span class="warn">이 부채꼴에 OSM 건물이 없습니다. 도심 좌표로 다시 시도하세요.</span>`;
+      } catch (err) {
+        status.innerHTML = `<span class="warn">${err.message}</span>`;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

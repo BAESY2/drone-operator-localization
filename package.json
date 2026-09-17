@@ -1,0 +1,13 @@
+{
+  "name": "drone-operator-localization",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Defensive drone operator localization API",
+  "scripts": {
+    "dev": "python -m src",
+    "start": "python -m src"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
