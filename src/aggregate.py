@@ -58,7 +58,12 @@ def aggregate_candidate(
     """단일 후보의 위치·고도·확률성분·이유를 집계."""
     lat = float(building["lat"])
     lng = float(building["lng"])
-    heuristic, heuristic_parts = calculate_score(building, observer)
+    heuristic, heuristic_parts = calculate_score(
+        building,
+        observer,
+        approach_bearing=bearing_deg,
+        rssi_dbm=rssi_dbm,
+    )
     precision, detail = candidate_precision_score(
         building, observer, bearing_deg, rssi_dbm, terrain_grid, fix
     )

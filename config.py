@@ -27,13 +27,16 @@ DEFAULT_RANGE_MIN_KM = 0.25
 DEFAULT_RANGE_MAX_KM = 50
 
 SCORING_WEIGHTS = {
-    "elevation": 0.15,
-    "los": 0.15,
-    "military_history": 0.25,
-    "tactical": 0.15,
-    "road": 0.1,
-    "building_type": 0.1,
-    "cell_tower": 0.1,
+    # Paper-aligned: AoA/LOS/RSSI first; no tallest-roof / military bias
+    "bearing_fit": 0.22,
+    "rssi_range": 0.16,
+    "los": 0.16,
+    "tactical": 0.12,
+    "road": 0.10,
+    "building_type": 0.08,
+    "elevation": 0.08,  # mid-elev preferred in soft curve (not max height)
+    "cell_tower": 0.05,
+    "military_history": 0.03,
 }
 
 assert abs(sum(SCORING_WEIGHTS.values()) - 1.0) < 0.01, "Weights must sum to 1.0"
@@ -64,7 +67,7 @@ PERFORMANCE_TARGETS = {
 
 VERSION = "2.0.0"
 PROJECT_NAME = "Drone Operator Localization"
-GITHUB_REPO = "https://github.com/baesy/drone-operator-localization"
+GITHUB_REPO = "https://github.com/BAESY2/drone-operator-localization"
 LICENSE = "MIT"
 
 # --- Optional geo gate + security ---

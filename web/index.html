@@ -208,6 +208,13 @@
     .hud .tag { color: var(--amber); letter-spacing: 0.1em; }
     .hud .tag.pulse { animation: pulse-tag 1s ease-in-out infinite; }
     @keyframes pulse-tag { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+    .legal-bar {
+      padding: 4px 10px; border-top: 1px solid var(--line);
+      background: #12140f; font-size: 0.62rem; color: var(--muted);
+      font-family: "IBM Plex Mono", monospace; line-height: 1.35;
+      display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline;
+    }
+    .legal-bar strong { color: var(--amber); letter-spacing: 0.06em; }
 
     .job-overlay {
       position: absolute; z-index: 600; inset: 0; pointer-events: none;
@@ -387,14 +394,19 @@
         <div class="blk">
           <details class="adv" open>
             <summary data-i18n="adv">API / AI keys (local)</summary>
+            <p class="hint" data-i18n="api_hint" style="margin-bottom:6px">Keys stay in this browser only. AI may rerank shortlist — never invents coords.</p>
             <label data-i18n="api_key">Server API Key</label>
-            <input id="keyIn" type="password" autocomplete="off" placeholder="X-API-Key" />
+            <input id="keyIn" type="password" autocomplete="off" placeholder="X-API-Key (if .env API_KEY set)" />
             <label style="margin-top:6px" data-i18n="ai_key">AI API Key</label>
             <input id="aiKeyIn" type="password" autocomplete="off" placeholder="sk-… / local LLM" />
             <label style="margin-top:6px" data-i18n="ai_base">AI Base URL</label>
             <input id="aiBaseIn" type="url" placeholder="https://api.openai.com/v1" />
             <label style="margin-top:6px" data-i18n="ai_model">AI Model</label>
             <input id="aiModelIn" type="text" placeholder="gpt-4o-mini" />
+            <label style="margin-top:8px;display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0">
+              <input type="checkbox" id="useAiNarrow" />
+              <span data-i18n="ai_narrow">AI narrow shortlist on FIX</span>
+            </label>
             <label style="margin-top:6px" data-i18n="track_title">Track JSON</label>
             <textarea id="track" placeholder='[{"t":0,"lat":52.52,"lng":13.40,"alt_m":80,"yaw_deg":90}]'></textarea>
             <button type="button" id="btnReverse" style="margin-top:6px;width:100%" data-i18n="reverse">REV GEO</button>
@@ -413,7 +425,7 @@
             <div class="job-bar"><i></i></div>
           </div>
         </div>
-        <div class="hud-float tl" id="hudTL">DEMO —</div>
+        <div class="hud-float tl" id="hudTL">READY</div>
         <div class="hud-float tr" id="hudTR">MODE OBS</div>
         <div class="hud-float bl" id="cursorHud">
           <div class="big" id="cursorCoord">— · —</div>
@@ -467,6 +479,10 @@
       <span class="tag" id="statusTag">SYS</span>
       <span class="msg" data-i18n="status_ready">Ready</span>
     </footer>
+    <div class="legal-bar" id="legalBar">
+      <strong data-i18n="legal_title">DEFENSIVE USE ONLY</strong>
+      <span data-i18n="legal_body">Probabilistic hypotheses · not ground truth · user assumes full liability · see LEGAL.md</span>
+    </div>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -518,6 +534,10 @@
         ai_key: "AI API Key",
         ai_base: "AI Base URL",
         ai_model: "AI Model",
+        ai_narrow: "AI narrow shortlist on FIX",
+        api_hint: "Keys stay in this browser. AI only reranks formula pool — never invents coords.",
+        legal_title: "DEFENSIVE USE ONLY",
+        legal_body: "Probabilistic hypotheses · not ground truth · user assumes full liability · LEGAL.md",
         track_title: "Track JSON",
         status_ready: "Ready · dbl-click / long-press to pin",
         legend: "P(contact)",
@@ -673,12 +693,12 @@
     let measureA = null;
 
     const PRESETS = [
-      { name: "Demo A", lat: 52.5200, lng: 13.4050, bearing: 90 },
-      { name: "Demo B", lat: 48.8566, lng: 2.3522, bearing: 45 },
-      { name: "Demo C", lat: 41.9028, lng: 12.4964, bearing: 180 },
-      { name: "Demo D", lat: 40.4168, lng: -3.7038, bearing: 270 },
-      { name: "Demo E", lat: 35.6762, lng: 139.6503, bearing: 0 },
-      { name: "Demo F", lat: -33.8688, lng: 151.2093, bearing: 120 },
+      { name: "Berlin", lat: 52.5200, lng: 13.4050, bearing: 90 },
+      { name: "Paris", lat: 48.8566, lng: 2.3522, bearing: 45 },
+      { name: "Rome", lat: 41.9028, lng: 12.4964, bearing: 180 },
+      { name: "Madrid", lat: 40.4168, lng: -3.7038, bearing: 270 },
+      { name: "Tokyo", lat: 35.6762, lng: 139.6503, bearing: 0 },
+      { name: "Sydney", lat: -33.8688, lng: 151.2093, bearing: 120 },
     ];
 
     function t(key) { return (I18N[lang] && I18N[lang][key]) || I18N.en[key] || key; }
@@ -741,11 +761,21 @@
     document.getElementById("aiKeyIn").value = localStorage.getItem("dol_ai_key") || "";
     document.getElementById("aiBaseIn").value = localStorage.getItem("dol_ai_base") || "https://api.openai.com/v1";
     document.getElementById("aiModelIn").value = localStorage.getItem("dol_ai_model") || "gpt-4o-mini";
+    const useAiEl = document.getElementById("useAiNarrow");
+    if (useAiEl) {
+      useAiEl.checked = localStorage.getItem("dol_ai_narrow") === "1"
+        || !!(localStorage.getItem("dol_ai_key") || "").trim();
+      useAiEl.addEventListener("change", () => {
+        localStorage.setItem("dol_ai_narrow", useAiEl.checked ? "1" : "0");
+        updateSecBadge();
+      });
+    }
 
     function persistAi() {
       localStorage.setItem("dol_ai_key", document.getElementById("aiKeyIn").value.trim());
       localStorage.setItem("dol_ai_base", document.getElementById("aiBaseIn").value.trim());
       localStorage.setItem("dol_ai_model", document.getElementById("aiModelIn").value.trim());
+      if (useAiEl && document.getElementById("aiKeyIn").value.trim()) useAiEl.checked = true;
       updateSecBadge();
     }
     document.getElementById("keyIn").addEventListener("change", (e) => {
@@ -760,13 +790,17 @@
       const srv = !!(document.getElementById("keyIn").value || "").trim();
       const ai = !!(document.getElementById("aiKeyIn").value || "").trim();
       const el = document.getElementById("secBadge");
-      el.textContent = (srv ? "SRV" : "LOCAL") + (ai ? "+AI" : "");
+      const narrow = !!document.getElementById("useAiNarrow")?.checked;
+      el.textContent = (srv ? "SRV" : "LOCAL") + (ai && narrow ? "+AI" : ai ? "+AI?" : "");
       el.classList.toggle("off", !ai);
     }
 
     function aiPayload() {
+      const key = (document.getElementById("aiKeyIn").value || "").trim();
+      const want = !!document.getElementById("useAiNarrow")?.checked;
       return {
-        ai_api_key: document.getElementById("aiKeyIn").value.trim() || undefined,
+        use_ai: want && !!key,
+        ai_api_key: key || undefined,
         ai_base_url: document.getElementById("aiBaseIn").value.trim() || undefined,
         ai_model: document.getElementById("aiModelIn").value.trim() || undefined,
       };
@@ -1599,6 +1633,10 @@
               const humanLine = c.human_score != null
                 ? `human=${Number(c.human_score).toFixed(2)} mid=${hp.mid_elevation ?? "?"} hide=${hp.concealment ?? "?"}`
                 : "";
+              const acc = c.accuracy || {};
+              const accLine = acc.confidence != null
+                ? `ACC ${Number(acc.confidence).toFixed(2)} · r̃=${acc.model_radius_m ?? "?"}m`
+                : "";
               const egLine = `EG F=${Number(eg.egress_foot ?? eg.foot ?? 0).toFixed(2)} B=${Number(eg.egress_bike ?? eg.bike ?? 0).toFixed(2)} M=${Number(eg.egress_motorcycle ?? eg.motorcycle ?? 0).toFixed(2)} C=${Number(eg.egress_car ?? eg.car ?? 0).toFixed(2)} MIL=${Number(eg.egress_armored ?? eg.armored ?? 0).toFixed(2)}`;
               const why = formatReasons(c.verify_reasons || c.reasons);
               return `<div class="cand" data-i="${i}">` +
@@ -1613,6 +1651,7 @@
               (civ ? ` · CIV ${String(civ).toUpperCase()}` : "") +
               (cctvN != null ? ` · CCTV ${cctvN}` : "") +
               (humanLine ? `<br>${humanLine}` : "") +
+              (accLine ? `<br>${accLine}` : "") +
               `<br>${egLine}` +
               `<br>${why}</span></div>`;
             }).join("")
@@ -1833,7 +1872,7 @@
       else map.removeLayer(Lyr);
     });
 
-    document.getElementById("hudTL").textContent = "DEMO A";
+    document.getElementById("hudTL").textContent = "READY";
     reversePlace(52.52, 13.405);
   </script>
 </body>

@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from config import API_FORMULA_POOL, API_MAX_CANDIDATES, API_SHORTLIST, VERSION
+from src.accuracy_model import accuracy_pack_for_candidate
 from src.agent_conference import run_agent_conference
 from src.candidate_pool import ai_narrow_candidates, clean_candidate_elevations
 from src.candidate_verify import verify_and_prune
@@ -181,7 +182,7 @@ def run_defensive_engine(
         candidates = kin_pack["candidates"]
         primary = candidates[0] if candidates else primary
 
-    # 4) Tight radius on each candidate
+    # 4) Tight radius + accuracy pack on each candidate
     tightened = []
     for c in candidates:
         tr = tighten_radius_m(
@@ -192,8 +193,16 @@ def run_defensive_engine(
             human_score=c.get("human_score"),
         )
         item = dict(c)
-        item["confidence_radius_m"] = tr["radius_m"]
+        acc = accuracy_pack_for_candidate(
+            item, rssi_dbm=signal_strength_dbm, n_observers=n_obs
+        )
+        # Blend model radius with tightened radius (take tighter when confident)
+        blended = min(float(tr["radius_m"]), float(acc["model_radius_m"]))
+        if acc["confidence"] >= 0.55:
+            blended = min(blended, float(tr["radius_m"]) * 0.92)
+        item["confidence_radius_m"] = round(blended, 1)
         item["radius_tight"] = tr
+        item["accuracy"] = acc
         tightened.append(item)
     candidates = tightened
     if candidates:

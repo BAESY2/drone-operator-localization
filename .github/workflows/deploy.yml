@@ -1,0 +1,14 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reminder
+        run: |
+          echo "Deploy with: vercel deploy --prod"
+          echo "Ensure TELEGRAM_BOT_TOKEN and Python runtime are configured."
